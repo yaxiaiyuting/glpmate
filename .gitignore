@@ -2,8 +2,13 @@
 *.db
 *.db-wal
 *.db-shm
-data/
-!glpmate/data/
+# 只排除数据库目录，不要写成 data/ —— 那会连 Android 的
+# app/src/main/java/.../data/ 包目录一起忽略掉（发版时踩过：
+# AppViewModel/BackendClient/Models/PythonBackend 四个文件被静默漏掉，
+# 仓库里的 Android 项目根本编译不了，而且 git status 里看不出来）。
+/glpmate-lite-data/
+glpmate/data/
+static/data/
 
 # Python
 __pycache__/

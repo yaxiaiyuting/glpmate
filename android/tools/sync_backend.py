@@ -19,8 +19,31 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-# 后端源码在这个仓库的根目录（android/ 的上一级）
-SRC = ROOT.parent / "glpmate"
+
+
+def find_backend() -> pathlib.Path | None:
+    """定位后端源码的 glpmate/ 目录。
+
+    要适配两种布局，因为它们在开发时和发布后不一样：
+      - 发布仓库：   <repo>/glpmate/            与 android/ 同级（android/ 是子目录）
+      - 独立开发目录：<work>/glpmate-native/  与 glpmate-lite/glpmate/ 是兄弟目录
+                       这时 android 的上一级就是 <work>/glpmate-lite
+
+    写死其中一种都会让另一种布局下脚本静默失效（发布版第一次克隆下来就踩到了：
+    报"有未同步的改动"，其实完全一致，因为它在错误的路径上找不到源码）。
+    """
+    candidates = [
+        ROOT.parent / "glpmate",               # 发布仓库：android/ 的上一级
+        ROOT.parent / "glpmate-lite" / "glpmate",
+        ROOT.parent.parent / "glpmate",        # 兜底
+    ]
+    for c in candidates:
+        if (c / "models.py").is_file():
+            return c
+    return None
+
+
+SRC = find_backend()
 ASSETS = ROOT / "app/src/main/assets/pyapp/code/glpmate"
 PY_SRC = ROOT / "app/src/main/python"
 
@@ -48,8 +71,13 @@ def main() -> int:
     ap.add_argument("--check", action="store_true", help="只检查不一致，不写入")
     args = ap.parse_args()
 
-    if not SRC.is_dir():
-        sys.exit(f"找不到后端源码：{SRC}（android/ 应该在仓库根目录下）")
+    if SRC is None or not SRC.is_dir():
+        sys.exit(
+            "找不到后端源码 glpmate/。\n"
+            "  已在这些位置找过：android/ 同级、android/../glpmate-lite/、上两级\n"
+            "  请确认仓库结构完整（glpmate/ 应与 android/ 同级）"
+        )
+    print(f"后端源码：{SRC}")
 
     stamped = False
     for dst in (ASSETS, PY_SRC):

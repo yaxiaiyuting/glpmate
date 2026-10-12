@@ -17,7 +17,7 @@ android {
         versionName = "1.0.0-native"
 
         ndk {
-            // 默认只打包真机架构（PLC110 是 arm64-v8a），APK 约 28MB。
+            // 默认只打包手机架构（arm64-v8a），APK 约 36MB。
             // 要在 x86_64 模拟器上调试时加 -PwithEmulatorAbi 会额外打包一套运行时
             // （体积翻倍，所以不作为默认）。用 Gradle 属性而不是注释切换，
             // 避免"为了测试改了文件忘了改回来"。

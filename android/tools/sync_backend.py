@@ -94,7 +94,13 @@ def main() -> int:
         else:
             print(f"已是最新：{label}")
 
-    # 戳记：代码变了才需要更新（gen_stamp 自己会判断是否最新）
+    # 戳记：必须在**同步之后**再算。
+    #
+    # 之前是先算戳记、再同步内容，于是戳记永远落后一步：本次算的是同步前那份
+    # assets 的哈希，而紧接着 assets 就被换成了新内容。后果是"同步一次"之后
+    # --check 仍然报不一致，而且如果就这样打包，APK 里的戳记描述的不是它自己
+    # 的内容——下次装到设备上可能被判定为"没变化"而跳过重新解压，继续跑旧代码。
+    # （这个坑正是本项目最初那两次故障的同一个根因，不能让它从构建脚本里复活。）
     gen = ROOT / "tools/gen_stamp.py"
     if gen.is_file():
         cmd = [sys.executable, str(gen)] + (["--check"] if args.check else [])

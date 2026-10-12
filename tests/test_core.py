@@ -52,10 +52,15 @@ class TestPharmacokinetics(unittest.TestCase):
         """单次给药：t=0 还没吸收、tmax 处最高、之后按半衰期衰减。"""
         self.assertEqual(bateman_fraction(0, HALF_LIFE, TMAX), 0.0)
         self.assertEqual(bateman_fraction(-6, HALF_LIFE, TMAX), 0.0)
-        self.assertAlmostEqual(bateman_fraction(TMAX, HALF_LIFE, TMAX), 1.0, places=9)
+        # 峰值是"剂量的 87.1%"，不是 100%。
+        # 这一条曾经断言 1.0，那等于说"吸收进来多少就还剩多少"，
+        # 忽略了达峰前已被清除的部分——见 models.bateman_fraction 的说明。
+        peak_frac = bateman_fraction(TMAX, HALF_LIFE, TMAX)
+        self.assertAlmostEqual(peak_frac, 0.870551, places=5)
+        self.assertLess(peak_frac, 1.0)
         # 峰值前后都应低于峰值
-        self.assertLess(bateman_fraction(TMAX - 8, HALF_LIFE, TMAX), 1.0)
-        self.assertLess(bateman_fraction(TMAX + 8, HALF_LIFE, TMAX), 1.0)
+        self.assertLess(bateman_fraction(TMAX - 8, HALF_LIFE, TMAX), peak_frac)
+        self.assertLess(bateman_fraction(TMAX + 8, HALF_LIFE, TMAX), peak_frac)
         # 消除相：达峰后再过一个半衰期，剩余约一半。
         # 与纯指数 0.5 略有偏差（吸收项此时仍有极小残留），偏差应在 5% 以内。
         ratio = bateman_fraction(TMAX + HALF_LIFE, HALF_LIFE, TMAX) / bateman_fraction(TMAX + 1, HALF_LIFE, TMAX)
@@ -83,7 +88,10 @@ class TestPharmacokinetics(unittest.TestCase):
         at_peak = level_at(t0 + timedelta(hours=TMAX), events, HALF_LIFE, TMAX)
         self.assertAlmostEqual(at_injection, 0.0, places=9)
         self.assertGreater(at_peak, at_injection)
-        self.assertAlmostEqual(at_peak, 2.5, places=6)
+        # 2.5 mg 的针，达峰时体内是 2.1764 mg（87.1%）——**不可能等于 2.5**。
+        # 曾经断言 2.5，等于让"体内剩余量"超过"打进去的总量"。
+        self.assertAlmostEqual(at_peak, 2.176376, places=5)
+        self.assertLess(at_peak, 2.5)
 
     def test_superposition_recurrence(self):
         """叠加：给药后 tmax 处的水平应等于历次末次剂量响应之和。"""
@@ -97,12 +105,16 @@ class TestPharmacokinetics(unittest.TestCase):
         """稳态峰值 = D·Σ b(tmax + k·间隔)。
 
         注意分母是 b(间隔 + tmax) 而不是 b(间隔)——峰值在 tmax 处，不在给药瞬间，
-        用 b(间隔) 会得到一个偏大的假稳态值（曾把 4.09 算成 4.58）。
+        用 b(间隔) 会得到一个偏大的假稳态值（曾把 3.67 算成 4.11）。
+        数字本身从 4.09 变成 3.67 是因为去掉了 bateman_fraction 的归一化，
+        量的口径变了，几何级数关系不变。
         """
         t0 = datetime(2026, 1, 1, 12, 0)
         series = sum(bateman_fraction(TMAX + k * WEEK, HALF_LIFE, TMAX) for k in range(200))
         steady = 2.5 * series
-        self.assertAlmostEqual(steady, 4.0919, places=3)
+        # 这里是**纯级数和**（3.5622）；theoretical_max 会再留 3% 余量，
+        # 所以它的值是 3.6691，两者不是同一个数，别混用。
+        self.assertAlmostEqual(steady, 3.562236, places=3)
         # 常见的错误闭式：用 b(间隔+tmax) 当公比会得到偏大的假稳态值，
         # 这里顺手钉住这个坑，防止以后又"化简"回去
         wrong = 2.5 / (1 - bateman_fraction(WEEK + TMAX, HALF_LIFE, TMAX))
@@ -134,9 +146,12 @@ class TestPharmacokinetics(unittest.TestCase):
         events = [DoseEvent(t0 + timedelta(days=7 * i), 2.5) for i in range(40)]
         trough = steady_state_trough(events, HALF_LIFE, WEEK, TMAX)
         peak = level_at(events[-1].at + timedelta(hours=TMAX), events, HALF_LIFE, TMAX)
-        self.assertGreater(peak / trough, 1.9)        # 替尔泊肽 5 天半衰期、每周一次：波动明显
-        self.assertLess(peak / trough, 2.1)
-        self.assertGreater(100 * peak / trough, 195.0)
+        # 替尔泊肽 5 天半衰期、每周一次：波动明显。
+        # 区间按独立方法核对过——对 30 周的剂量序列每 15 分钟密集采样，
+        # 真实峰/谷 = 2.2475，公式给 2.2434（差 0.2%）。原来的上界 2.1 是错的。
+        self.assertGreater(peak / trough, 2.1)
+        self.assertLess(peak / trough, 2.35)
+        self.assertGreater(100 * peak / trough, 210.0)
 
     def test_curve_samples_the_peak(self):
         """曲线必须采到达峰时刻，否则画出来是假的平滑线。"""
@@ -691,3 +706,62 @@ class TestBmi(unittest.TestCase):
         # 80kg 在 175cm 下仍是超重（BMI 26.1），这个事实必须如实反映
         self.assertEqual(b["target_category"]["label"], "超重")
         self.assertAlmostEqual(b["to_healthy_kg"], 70.8, places=1)
+
+class TestDoseMassConservation(unittest.TestCase):
+    """体内剩余量永远不能超过累计注射量。
+
+    这一组测试是为一个真实 bug 加的回归保护：`bateman_fraction` 曾经把自己
+    在 tmax 处的值归一化成 1.0，于是"单次给药的峰值 = 剂量的 100%"——
+    2.5 mg 的针打进去，界面显示体内峰值 2.5 mg，**等于忽略了达峰前已被
+    清除掉的那 12.9%**。用户在真机上看出"这不对"，因为体内不可能比打进去的还多。
+
+    正确的物理约束有两条，都很便宜，但漏掉任何一条都会让数字看起来很合理、
+    实际上不可信：
+      1. 任意时刻的体内剩余量 ≤ 到该时刻为止累计注射的量
+      2. 单次给药的峰值 < 该次剂量（达峰时已经有药被清除了）
+    """
+
+    def test_single_dose_peak_below_dose(self):
+        """第一条：单剂峰值必须严格小于剂量。"""
+        for half_life, tmax in ((120.0, 24.0), (168.0, 24.0), (72.0, 12.0), (120.0, 72.0)):
+            with self.subTest(half_life=half_life, tmax=tmax):
+                peak = bateman_fraction(tmax, half_life, tmax)
+                self.assertLess(peak, 1.0, "单剂峰值不能等于或超过剂量")
+                self.assertGreater(peak, 0.5, "但也不该低得离谱")
+
+    def test_impulse_response_matches_bateman(self):
+        """两个函数必须同口径：一个归一化、一个不归一化就会破坏所有百分比。"""
+        for t in (6.0, 12.0, 24.0, 48.0, 120.0):
+            self.assertAlmostEqual(
+                impulse_response(t, HALF_LIFE, TMAX),
+                bateman_fraction(t, HALF_LIFE, TMAX),
+                places=12,
+            )
+
+    def test_level_never_exceeds_cumulative_dose(self):
+        """第二条：细扫整条曲线，处处都不能超过累计注射量。
+
+        用 8 周的剂量序列（含未来投影的那种形状），每 15 分钟扫一次。
+        """
+        t0 = datetime(2026, 1, 5, 12, 0)
+        events = [DoseEvent(t0 + timedelta(days=7 * i), 2.5) for i in range(8)]
+        t = t0
+        worst_ratio = 0.0
+        while t <= t0 + timedelta(days=7 * 8):
+            level = level_at(t, events, HALF_LIFE, TMAX)
+            given = sum(ev.mg for ev in events if ev.at <= t)
+            if given > 0:
+                worst_ratio = max(worst_ratio, level / given)
+            t += timedelta(minutes=15)
+        self.assertLessEqual(worst_ratio, 1.0, f"体内水平达到累计剂量的 {worst_ratio:.3f} 倍")
+        self.assertGreater(worst_ratio, 0.5, "也不该低到不合理")
+
+    def test_first_dose_is_about_60_percent_of_steady_state(self):
+        """首剂峰值约为稳态峰值的 61%（说明书参数下），与原版 App 的显示一致。"""
+        t0 = datetime(2026, 1, 5, 12, 0)
+        first = level_at(t0 + timedelta(hours=TMAX), [DoseEvent(t0, 2.5)], HALF_LIFE, TMAX)
+        events = [DoseEvent(t0 + timedelta(days=7 * i), 2.5) for i in range(40)]
+        steady = level_at(events[-1].at + timedelta(hours=TMAX), events, HALF_LIFE, TMAX)
+        ratio = 100 * first / steady
+        self.assertGreater(ratio, 58.0)
+        self.assertLess(ratio, 64.0)

@@ -216,35 +216,60 @@ class DoseEvent:
 
 
 def impulse_response(t_hours: float, half_life_hours: float, tmax_hours: float) -> float:
-    """单位剂量的冲激响应（已按峰值归一化，t=tmax 时等于 1）。
+    """单位剂量的冲激响应：打了 1 mg，t 小时后体内还剩多少。
 
-    归一化不是"为了好看"，而是必须与 level_at 用的是同一个函数，
-    否则 Σ 冲激响应(t + k·间隔) 求稳态峰值时会整体偏小（实测偏小 17%）。
-    卷积性质不会因为常数倍缩放而改变，所以归一化后求和仍然成立。
+    **返回真实量纲**（峰值 ≈0.87 而不是 1.0），与 `bateman_fraction` 同口径。
+
+    ============ 这里曾经归一化过（别再归一化回去）============
+    旧实现除以自身在 tmax 处的值，把峰值强行变成 1.0。当时这么写的理由是
+    "Σ 冲激响应 求稳态峰值会偏小 17%"——但那个 17% 是**虚高**：归一化把
+    首剂峰值抬到了剂量的 100%（忽略达峰前已清除的部分），多出来的量在
+    多周期求和时被放大成 17% 的假上界。
+
+    更要紧的是它会和 `steady_state_trough` 量纲打架：那个函数走的是
+    `bateman_fraction`，一旦两者一个归一化、一个不归一化，**比值（也就是界面上
+    所有的百分比）就被破坏**——实测稳态峰值/谷值会从 2.02 变成 2.18。
+
+    现在两个函数都返回"剩余量占剂量的比例"，比值因此与缩放无关，
+    百分比口径稳定；绝对 mg 值也终于符合物理（首剂峰值 = 剂量的 87.1%）。
     """
-    if t_hours <= 0:
+    if t_hours <= 0 or half_life_hours <= 0:
         return 0.0
     ke = math.log(2.0) / half_life_hours
-    ka = _solve_ka(ke, max(1.0, float(tmax_hours or 1.0)))
-    raw = math.exp(-ke * t_hours) - math.exp(-ka * t_hours)
-    raw_max = (math.exp(-ke * tmax_hours) - math.exp(-ka * tmax_hours)) or 1.0
-    return raw / raw_max
+    tmax = max(1.0, float(tmax_hours or 1.0))
+    ka = _solve_ka(ke, tmax)
+    if ka <= ke:
+        return max(0.0, decay_fraction_exp(t_hours, half_life_hours))
+    return max(0.0, ka / (ka - ke) * (math.exp(-ke * t_hours) - math.exp(-ka * t_hours)))
 
 
 def bateman_fraction(t_hours: float, half_life_hours: float, tmax_hours: float) -> float:
-    """单次皮下给药后的相对水平（0~1）：t=tmax 时为 1，之后按半衰期衰减。
+    """单次皮下给药后，**体内还剩多少**（占该次剂量的比例）。
 
-    t=0 时为 0——针刚打完药还没吸收进来。说明书说 tmax 中位 24 小时，
-    所以界面在注射当天应该画出"上升 → 达峰 → 回落"，而不是瞬间满格。
+    t=0 为 0（针刚打完还没吸收），t=tmax 处最大，之后按半衰期衰减到 0。
+
+    ============ 这里曾经有个量纲错误（别再"归一化"回去）============
+    旧实现除以 `impulse_response(tmax, ...)`，把峰值强制成 1.0。后果是
+    "单次给药的峰值 = 剂量的 100%"——等于说吸收进来多少就还剩多少，
+    **完全忽略了达峰之前已经被清除掉的那部分**。
+
+    用说明书参数（半衰期 120h、tmax 24h）算，真实峰值只有剂量的 **87.1%**：
+    在 t=24h 时 e^(-ka·t) 已经不是小数（≈0.036），它要从吸收项里减掉，
+    把幅度系数 ka/(ka-ke)≈1.044 抵消了大半。旧实现因此把首剂水平高估 12.9%，
+    用户会看到"2.5 mg 的针打进去、体内峰值 2.5 mg"这种物理上不可能的数。
+
+    现在返回真实比例（峰值 0.871、长时趋于 0）。由于只是乘了一个常数，
+    所有**比值**（稳态谷值/峰值、蓄积比、达峰时间、各 % 口径）完全不变，
+    受影响的只有绝对 mg 值。
     """
     if half_life_hours <= 0 or t_hours <= 0:
         return 0.0
+    ke = math.log(2.0) / half_life_hours
     tmax = max(1.0, float(tmax_hours or 1.0))
-    raw = impulse_response(t_hours, half_life_hours, tmax)
-    raw_max = impulse_response(tmax, half_life_hours, tmax)
-    if raw_max <= 0:
-        return decay_fraction_exp(t_hours, half_life_hours)
-    return max(0.0, raw / raw_max)
+    ka = _solve_ka(ke, tmax)
+    if ka <= ke:
+        return max(0.0, decay_fraction_exp(t_hours, half_life_hours))
+    return max(0.0, ka / (ka - ke) * (math.exp(-ke * t_hours) - math.exp(-ka * t_hours)))
 
 
 def _solve_ka(ke: float, tmax: float, iterations: int = 80) -> float:

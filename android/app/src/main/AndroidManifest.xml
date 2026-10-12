@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 提醒推送：用 AlarmManager + 本地通知，不引 WorkManager（少一个依赖，
+         而且提醒时间是用户设定的固定钟点，不需要 JobScheduler 那套约束） -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <application
+        android:allowBackup="false"
+        android:label="GLP Mate"
+        android:supportsRtl="true"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:theme="@style/Theme.GlpMate">
+
+        <!-- 仅调试构建启用：跳过通知权限弹窗，便于屏幕锁定状态下验证界面。
+             正式构建不带这一项（见 app/build.gradle.kts 的 manifestPlaceholders）。 -->
+        <meta-data
+            android:name="glpmate.skipNotificationPrompt"
+            android:value="${skipNotificationPrompt}" />
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustNothing"
+            android:theme="@style/Theme.GlpMate">
+
+        <!-- 仅调试构建启用：跳过通知权限弹窗，便于屏幕锁定状态下验证界面。
+             正式构建不带这一项（见 app/build.gradle.kts 的 manifestPlaceholders）。 -->
+        <meta-data
+            android:name="glpmate.skipNotificationPrompt"
+            android:value="${skipNotificationPrompt}" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- 到点弹提醒。用 goAsync 之外的最简实现：onReceive 里只做发通知这一件事 -->
+        <receiver
+            android:name=".notify.ReminderReceiver"
+            android:exported="false" />
+
+        <!-- 重启后重新排提醒：AlarmManager 的闹钟不跨重启 -->
+        <receiver
+            android:name=".notify.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

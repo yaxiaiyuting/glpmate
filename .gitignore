@@ -1,0 +1,33 @@
+# 数据库一律不入库：里面是真实的用药与体重记录
+*.db
+*.db-wal
+*.db-shm
+data/
+!glpmate/data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Gradle / Android
+.gradle/
+build/
+local.properties
+*.apk
+*.aab
+*.keystore
+*.jks
+captures/
+
+# IDE / 系统
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# 本地环境
+*.log
+.env

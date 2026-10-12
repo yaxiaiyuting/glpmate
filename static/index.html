@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0B0F12">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="自托管的 GLP-1 记录与教练助手">
+  <title>GLP Mate Lite</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230B0F12'/%3E%3Cpath d='M16 7c4 4.4 6.5 7.8 6.5 10.6A6.5 6.5 0 0 1 9.5 17.6C9.5 14.8 12 11.4 16 7z' fill='%2335C6E8'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+  <a class="skip-link" href="#outlet">跳到主要内容</a>
+
+  <div id="app" class="app">
+    <main id="outlet" class="outlet" role="main" aria-label="主要内容">
+      <div class="boot">
+        <div class="boot-mark" aria-hidden="true"></div>
+        <p class="boot-text">正在加载…</p>
+      </div>
+    </main>
+
+    <nav id="tabbar" class="tabbar" aria-label="主导航"></nav>
+  </div>
+
+  <noscript>
+    <p class="boot-error">这个应用需要 JavaScript 才能运行。</p>
+  </noscript>
+
+  <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

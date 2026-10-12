@@ -1,0 +1,607 @@
+{
+  "drugs": {
+    "tirzepatide": {
+      "half_life_hours": 120,
+      "half_life_range_hours": null,
+      "tmax_hours": 24,
+      "bioavailability_pct": 80,
+      "steady_state_weeks": 4,
+      "accumulation_ratio": 1.75,
+      "clearance": "0.056 L/h, apparent population mean (CV% 20.9%), in patients with overweight or obesity (Zepbound label 12.3). Mounjaro label (T2D) states 0.061 L/h; EU SmPC states 'approximately 0.06 L/h'.",
+      "volume_of_distribution": "Approximately 9.7 L (CV% 28.5%), mean apparent steady-state volume of distribution after SC administration in patients with overweight or obesity (Zepbound label 12.3). Mounjaro label (T2D) states 10.3 L; EU SmPC gives 10.3 L (T2D) and 9.7 L (obesity).",
+      "dose_steps_mg": [
+        2.5,
+        5,
+        7.5,
+        10,
+        12.5,
+        15
+      ],
+      "interval_days": 7,
+      "brand_names": [
+        "Mounjaro",
+        "Zepbound",
+        "穆峰达"
+      ],
+      "elimination_after_last_dose": "NOT STATED as an explicit 'X days after the last injection' sentence in the Zepbound (obesity) label. The only label wording tying time to elimination is the Overdosage section: 'A period of observation and treatment for these symptoms may be necessary, taking into account the half-life of tirzepatide of approximately 5 days.' The EU Mounjaro SmPC states a planning interval based on half-life: 'Tirzepatide should be discontinued at least 1 month before a planned pregnancy due to the long half-life.'",
+      "sources": [
+        {
+          "claim": "Elimination half-life approximately 5 days; apparent population mean clearance 0.056 L/h (obesity/overweight)",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2024/217806s003lbl.pdf",
+          "quote": "The apparent population mean clearance (CV%) of tirzepatide in patients with overweight or obesity is 0.056 L/h (20.9%) with an elimination half-life of approximately 5 days."
+        },
+        {
+          "claim": "tmax median 24 hours (range 8 to 72 hours); mean absolute subcutaneous bioavailability 80%",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2024/217806s003lbl.pdf",
+          "quote": "Following subcutaneous administration, the median time (range) to maximum plasma concentration of tirzepatide is 24 hours (8 to 72 hours). The mean absolute bioavailability of tirzepatide following subcutaneous administration is 80%."
+        },
+        {
+          "claim": "Steady state reached after 4 weeks of once-weekly dosing",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2024/217806s003lbl.pdf",
+          "quote": "Steady-state plasma tirzepatide concentrations were achieved following 4 weeks of once weekly administration."
+        },
+        {
+          "claim": "Apparent steady-state volume of distribution approximately 9.7 L",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2024/217806s003lbl.pdf",
+          "quote": "The mean [coefficient of variation (CV)%] apparent steady-state volume of distribution of tirzepatide following subcutaneous administration in patients with overweight or obesity is approximately 9.7 L (28.5%)."
+        },
+        {
+          "claim": "Dose escalation: start 2.5 mg once weekly, increase to 5 mg after 4 weeks, then 2.5 mg increments after at least 4 weeks per step",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2024/217806s003lbl.pdf",
+          "quote": "The recommended starting dosage of ZEPBOUND is 2.5 mg injected subcutaneously once weekly. The 2.5 mg dosage is for treatment initiation and is not intended for chronic weight management."
+        },
+        {
+          "claim": "Dose escalation (continued)",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2024/217806s003lbl.pdf",
+          "quote": "After 4 weeks, increase the dosage to 5 mg injected subcutaneously once weekly."
+        },
+        {
+          "claim": "Dose escalation (continued) - 2.5 mg increments, max 15 mg weekly",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2024/217806s003lbl.pdf",
+          "quote": "The dosage may be increased in 2.5 mg increments, after at least 4 weeks on the current dose."
+        },
+        {
+          "claim": "Maximum dosage 15 mg once weekly; weekly interval",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2024/217806s003lbl.pdf",
+          "quote": "The maximum dosage of ZEPBOUND is 15 mg injected subcutaneously once weekly."
+        },
+        {
+          "claim": "Accumulation ratio 1.75 at steady state (obesity/overweight, population PK from SURMOUNT-1)",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/nda/2024/217806Orig1s000ClinPharmR.pdf",
+          "quote": "Mean accumulation ratio was 1.75."
+        },
+        {
+          "claim": "Accumulation ratio 1.6 in patients with type 2 diabetes (Study GPGA, AUC0-tau based)",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/nda/2024/217806Orig1s000ClinPharmR.pdf",
+          "quote": "Multiple QW doses over a 4-week duration resulted in an accumulation ratio of 1.6 in patients with T2DM, based on AUC0-tau."
+        },
+        {
+          "claim": "Absolute subcutaneous bioavailability 80.9% vs IV bolus (Study GPGE Part D)",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/nda/2024/217806Orig1s000ClinPharmR.pdf",
+          "quote": "The mean absolute bioavailability of tirzepatide following subcutaneous (SC) administration when compared to IV bolus is 80.9% (Study GPGE, Part D)."
+        },
+        {
+          "claim": "tmax 24 hours (range 8 to 72) after multiple SC dosing (Study GPGA)",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/nda/2024/217806Orig1s000ClinPharmR.pdf",
+          "quote": "In Study GPGA, following multiple SC administration for 4 weeks of 0.5 mg (QW), 5 mg (QW), 5/5/10/10 mg, and 5/5/10/15 mg to patients with T2DM, tmax (range) is 24 (8 to 72) hours."
+        },
+        {
+          "claim": "Half-life approximately 5 days in patients with T2DM supports once-weekly dosing",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/nda/2024/217806Orig1s000ClinPharmR.pdf",
+          "quote": "Mean t1/2 in patients with T2DM was approximately 5 days, supporting a QW dosing regimen."
+        },
+        {
+          "claim": "No explicit statement of elimination time after the last dose in the Zepbound label; Overdosage section refers to the 5-day half-life",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2024/217806s003lbl.pdf",
+          "quote": "A period of observation and treatment for these symptoms may be necessary, taking into account the half-life of tirzepatide of approximately 5 days."
+        },
+        {
+          "claim": "EU SmPC uses the long half-life to specify a 1-month interval before a planned pregnancy",
+          "url": "https://www.ema.europa.eu/en/documents/product-information/mounjaro-epar-product-information_en.pdf",
+          "quote": "Tirzepatide should be discontinued at least 1 month before a planned pregnancy due to the long half-life (see section 5.2)."
+        },
+        {
+          "claim": "EU SmPC section 5.2: tmax 8-72 h, steady state 4 weeks, absolute bioavailability 80%, clearance approximately 0.06 L/h, half-life approximately 5 days",
+          "url": "https://www.ema.europa.eu/en/documents/product-information/mounjaro-epar-product-information_en.pdf",
+          "quote": "Maximum concentration of tirzepatide is reached 8 to 72 hours post dose. Steady state exposure is achieved following 4 weeks of once weekly administration."
+        },
+        {
+          "claim": "EU SmPC section 5.2 elimination wording",
+          "url": "https://www.ema.europa.eu/en/documents/product-information/mounjaro-epar-product-information_en.pdf",
+          "quote": "The apparent population mean clearance of tirzepatide is approximately 0.06 L/h with an elimination half-life of approximately 5 days, enabling once weekly administration."
+        },
+        {
+          "claim": "Mounjaro (type 2 diabetes) label: clearance 0.061 L/h, half-life approximately 5 days",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/215866s044s045lbl.pdf",
+          "quote": "The apparent population mean clearance of tirzepatide is 0.061 L/h with an elimination half-life of approximately 5 days, enabling once-weekly dosing."
+        },
+        {
+          "claim": "Mounjaro label: adverse reactions in the pooled placebo-controlled SURPASS trials in adults with type 2 diabetes (nausea 4/12/15/18%; diarrhoea 9/12/13/17%; vomiting 2/5/5/9%; constipation 1/6/6/7% for placebo/5 mg/10 mg/15 mg)",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/215866s044s045lbl.pdf",
+          "quote": "Table 1: Adverse Reactions in Pool of Placebo-Controlled Trials Reported in ≥5% of MOUNJARO-treated Adult Patients with Type 2 Diabetes Mellitus"
+        },
+        {
+          "claim": "GI adverse reactions occurred more frequently than placebo and mostly during dose escalation",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/215866s044s045lbl.pdf",
+          "quote": "In the pool of placebo-controlled trials in adults, gastrointestinal adverse reactions occurred more frequently among patients receiving MOUNJARO than placebo (placebo 20.4%, MOUNJARO 5 mg 37.1%, MOUNJARO 10 mg 39.6%, MOUNJARO 15 mg 43.6%)."
+        },
+        {
+          "claim": "Time course: GI events concentrated during dose escalation and decreased over time (Mounjaro label, section 6.1)",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/215866s044s045lbl.pdf",
+          "quote": "The majority of reports of nausea, vomiting, and/or diarrhea occurred during dose escalation and decreased over time."
+        },
+        {
+          "claim": "Chinese brand name for tirzepatide injection is 穆峰达 (MOUNJARO), per Lilly China prescribing information",
+          "url": "https://www.lillymedical.cn/file/raw/5f79115e-dc7c-4961-9b6a-94596c7403f1/%e6%9b%bf%e5%b0%94%e6%b3%8a%e8%82%bd%e6%b3%a8%e5%b0%84%e6%b6%b2%e4%ba%a7%e5%93%81%e8%af%b4%e6%98%8e%e4%b9%a6%ef%bc%88%e5%a4%9a%e5%89%82%e9%87%8f%e9%a2%84%e8%a3%85%e7%ac%94%e5%bc%8f%e6%b3%a8%e5%b0%84%e5%99%a8%ef%bc%89%e3%80%90%e4%bf%ae%e8%ae%a2%e6%97%a5%e6%9c%9f%ef%bc%9a2025%e5%b9%b408%e6%9c%8820%e6%97%a5%e3%80%91.pdf",
+          "quote": "商品名称：穆峰达® （MOUNJARO ®）"
+        }
+      ],
+      "confidence": "high",
+      "notes": "half_life_hours = 120 is a unit conversion of the label's verbatim 'approximately 5 days' (5 x 24 h); no numeric half-life in hours is printed in any source. No half-life RANGE is given by any source, so half_life_range_hours is null. tmax_hours = 24 is the label's stated MEDIAN (range 8-72 h) - the median is printed in the Zepbound label; the Mounjaro/EU text gives only the 8-72 h range. accumulation_ratio: two different values exist - 1.75 (obesity/overweight population PK, the relevant population for weight management, reported in the FDA Clinical Pharmacology review) and 1.6 (T2DM, Study GPGA). 1.75 was placed in the numeric field. The Chinese-language Lilly PI states an elimination half-life of 'approximately 5 to 6 days', slightly wider than the English labels' 'approximately 5 days'; this is noted but not used, as the English label is the primary source requested. No explicit 'drug eliminated ~X days after last dose' sentence exists in the Zepbound label; the closest regulatory wordings are quoted in elimination_after_last_dose. Page numbers in the FDA PDFs: the Zepbound label PDF page index equals its printed page number (PK text on printed p.12, Overdosage on p.11, section 2.2 dosing on p.4, Table 2 adverse reactions on p.8). For the 2026 Mounjaro label the cited text sits at PDF pages 7 (Table 1), 13-14 (section 12.3); the printed page numbers could not be confirmed from the extracted text, so section numbers are given as the stable locator."
+    },
+    "semaglutide": {
+      "half_life_hours": 168,
+      "half_life_range_hours": null,
+      "tmax_hours": 24,
+      "bioavailability_pct": 89,
+      "steady_state_weeks": 4,
+      "accumulation_ratio": null,
+      "clearance": "Approximately 0.05 L/h apparent clearance - in patients with overweight or obesity (Wegovy 2.4 mg) and in patients with type 2 diabetes (Ozempic injection). Described as 'apparent' for Wegovy and as 'clearance' for Ozempic.",
+      "volume_of_distribution": "Approximately 12.5 L mean (Wegovy, subcutaneous, patients with overweight/obesity) / 12.5 L mean apparent volume of distribution (Ozempic injection, T2D). EU Wegovy SmPC states 12.4 L.",
+      "dose_steps_mg": [
+        0.25,
+        0.5,
+        1,
+        1.7,
+        2.4
+      ],
+      "interval_days": 7,
+      "brand_names": [
+        "Ozempic",
+        "Wegovy",
+        "Rybelsus",
+        "诺和泰",
+        "诺和盈"
+      ],
+      "elimination_after_last_dose": "Wegovy (2.4 mg, obesity): 'With an elimination half-life of approximately 1 week, semaglutide will be present in the circulation for about 5 to 7 weeks after the last injectable dose of 2.4 mg or 7.2 mg or oral dose of 25 mg.' Ozempic injection (1.0 mg, T2D): 'With an elimination half-life of approximately 1 week, semaglutide will be present in the circulation for about 5 weeks after the last dose.' EU Wegovy SmPC (section 5.2): '...approximately 7 weeks after the last dose of 2.4 mg.'",
+      "sources": [
+        {
+          "claim": "Wegovy (2.4 mg) elimination half-life approximately 1 week and circulation persistence after the last dose",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/215256s025lbl.pdf",
+          "quote": "The apparent clearance of semaglutide in patients with overweight or obesity is approximately 0.05 L/h. With an elimination half-life of approximately 1 week, semaglutide will be present in the circulation for about 5 to 7 weeks after the last injectable dose of 2.4 mg or 7.2 mg or oral dose of 25 mg."
+        },
+        {
+          "claim": "Wegovy subcutaneous absolute bioavailability 89% and tmax 1 to 3 days post dose",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/215256s025lbl.pdf",
+          "quote": "Absolute bioavailability of semaglutide is 89% following subcutaneous administration. Maximum concentration of semaglutide is reached 1 to 3 days post dose."
+        },
+        {
+          "claim": "Wegovy mean volume of distribution approximately 12.5 L after subcutaneous administration",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/215256s025lbl.pdf",
+          "quote": "The mean volume of distribution of semaglutide following subcutaneous administration in patients with obesity or overweight is approximately 12.5 L."
+        },
+        {
+          "claim": "Wegovy dose escalation table: 0.25 mg weeks 1-4, 0.5 mg weeks 5-8, 1 mg weeks 9-12, 1.7 mg weeks 13-16, then maintenance",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/215256s025lbl.pdf",
+          "quote": "Table 1. Recommended Starting Dosage and Dosage Escalation of WEGOVY Injection for All Approved Indications in Adults and Pediatric Patients Aged 12 Years and Older"
+        },
+        {
+          "claim": "Wegovy maintenance dosages are 1.7 mg or 2.4 mg once weekly",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/215256s025lbl.pdf",
+          "quote": "The maintenance dosage of WEGOVY for weight reduction in adults is either 1.7 mg or 2.4 mg"
+        },
+        {
+          "claim": "Ozempic injection: steady-state exposure achieved after 4 to 5 weeks of once-weekly administration",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2025/209637s035,209637s037lbl.pdf",
+          "quote": "Steady-state exposure is achieved following 4 to 5 weeks of once-weekly administration."
+        },
+        {
+          "claim": "Ozempic injection: absolute bioavailability 89%, tmax 1 to 3 days",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2025/209637s035,209637s037lbl.pdf",
+          "quote": "Absolute bioavailability of semaglutide is 89%. Maximum concentration of semaglutide is reached 1 to 3 days post dose."
+        },
+        {
+          "claim": "Ozempic injection: apparent clearance approximately 0.05 L/h, half-life approximately 1 week, present in circulation about 5 weeks after the last dose",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2025/209637s035,209637s037lbl.pdf",
+          "quote": "The apparent clearance of semaglutide in patients with type 2 diabetes is approximately 0.05 L/h. With an elimination half-life of approximately 1 week, semaglutide will be present in the circulation for about 5 weeks after the last dose."
+        },
+        {
+          "claim": "Ozempic injection: mean apparent volume of distribution approximately 12.5 L in type 2 diabetes",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2025/209637s035,209637s037lbl.pdf",
+          "quote": "The mean apparent volume of distribution of semaglutide following subcutaneous administration in patients with type 2 diabetes is approximately 12.5L."
+        },
+        {
+          "claim": "Ozempic dose escalation: 0.25 mg once weekly for 4 weeks, then 0.5 mg; maintenance 0.5 mg, 1 mg or 2 mg; maximum 2 mg once weekly",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2025/209637s035,209637s037lbl.pdf",
+          "quote": "Initiate OZEMPIC with a dosage of 0.25 mg injected subcutaneously once weekly for 4 weeks."
+        },
+        {
+          "claim": "Ozempic is dosed once weekly and the maximum recommended dosage is 2 mg once weekly",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2025/209637s035,209637s037lbl.pdf",
+          "quote": "The maximum recommended dosage is 2 mg once weekly."
+        },
+        {
+          "claim": "Ozempic maintenance and maximum dosage",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2025/209637s035,209637s037lbl.pdf",
+          "quote": "The recommended maintenance dosage is 0.5 mg, 1 mg, or 2 mg, injected subcutaneously once weekly, based on glycemic control."
+        },
+        {
+          "claim": "EU Wegovy SmPC: subcutaneous absolute bioavailability 89%; steady-state exposure stable up to week 72; clearance approximately 0.05 L/h",
+          "url": "https://www.ema.europa.eu/en/documents/product-information/wegovy-epar-product-information_en.pdf",
+          "quote": "The clearance of semaglutide in patients with overweight (BMI ≥27 kg/m2 to < 30 kg/m2) or obesity (BMI ≥30 kg/m2) was approximately 0.05 L/h. With an elimination half-life of approximately 1 week, semaglutide will be present in the circulation for approximately 7 weeks after the last dose of 2.4 mg."
+        },
+        {
+          "claim": "EU Ozempic SmPC section 5.2: tmax 1-3 days, steady state 4-5 weeks, absolute bioavailability 89%, half-life approximately 1 week",
+          "url": "https://www.ema.europa.eu/en/documents/product-information/ozempic-epar-product-information_en.pdf",
+          "quote": "Maximum concentration was reached 1 to 3 days post dose. Steady state exposure was achieved following 4–5 weeks of once weekly administration."
+        },
+        {
+          "claim": "Wegovy label Table 3 (pooled 3 randomised placebo-controlled obesity trials, n=2116 Wegovy 2.4 mg vs n=1261 placebo): nausea 44% vs 16%, diarrhoea 30% vs 16%, vomiting 24% vs 6%, constipation 24% vs 11%",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/215256s025lbl.pdf",
+          "quote": "Table 3. Adverse Reactions (≥2% and Greater Than Placebo) in WEGOVY 2.4 mg Injection-treated Adults with Obesity or Overweight for Weight Reduction"
+        },
+        {
+          "claim": "Wegovy safety population description for Table 3",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/215256s025lbl.pdf",
+          "quote": "WEGOVY was evaluated for safety in 3 randomized, double-blind, placebo-controlled trials that included 2,116 adult patients with obesity or overweight treated with 2.4 mg WEGOVY injection for up to 68 weeks and a 7-week off-drug follow-up period"
+        },
+        {
+          "claim": "Wegovy GI discontinuations (nausea 1.8%, vomiting 1.2%, diarrhoea 0.7% vs placebo 0.2%, 0%, 0.1%)",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/215256s025lbl.pdf",
+          "quote": "The most common adverse reactions leading to discontinuation were nausea (1.8% versus 0.2%), vomiting (1.2% versus 0%), and diarrhea (0.7% versus 0.1%) for WEGOVY and placebo, respectively."
+        },
+        {
+          "claim": "Chinese brand name 诺和盈 is semaglutide injection approved in China for long-term weight management (official Novo Nordisk China release)",
+          "url": "https://www.novonordisk.com.cn/content/dam/nncorp/cn/zh_cn/ir-materials/pdfs/2024/2024062501.pdf",
+          "quote": "国家药品监督管理局（NMPA）批准了诺和诺德公司研发生产的诺和盈®（用于长期体重管理的司美格鲁肽注射液）在中国的上市申请。"
+        },
+        {
+          "claim": "Chinese brand name 诺和泰 is used by Novo Nordisk China for its once-weekly GLP-1 product (Ozempic, semaglutide)",
+          "url": "https://www.novonordisk.com.cn/content/dam/nncorp/cn/zh_cn/ir-materials/pdfs/2021/210814.pdf",
+          "quote": "中国首个具有心血管适应症的GLP-1周制剂诺和泰®正式上市"
+        }
+      ],
+      "confidence": "high",
+      "notes": "half_life_hours = 168 is a unit conversion of the verbatim 'approximately 1 week' (7 x 24 h); no numeric half-life in hours is printed. tmax_hours = 24 is the LOWER bound of the label's stated '1 to 3 days' (24-72 h) range; the schema requires a single number and no central value is printed, so do not read 24 h as a point estimate. steady_state_weeks = 4 is the LOWER bound of the Ozempic label's '4 to 5 weeks'; the Wegovy label does NOT state a time to steady state at all, so the 4-5 week figure is taken from the Ozempic injection label for the same molecule/route. accumulation_ratio: NOT reported anywhere in the Wegovy or Ozempic labels, nor in the EMA SmPCs -> null. bioavailability_pct 89% applies to the subcutaneous route for both Ozempic injection and Wegovy; the oral (Rybelsus/Wegovy tablet) route is ~1-2% and is out of scope here. The Wegovy label does NOT contain a 'GI events decreased over time' sentence (unlike the tirzepatide labels)."
+    },
+    "liraglutide": {
+      "half_life_hours": 13,
+      "half_life_range_hours": null,
+      "tmax_hours": 8,
+      "bioavailability_pct": 55,
+      "steady_state_weeks": null,
+      "accumulation_ratio": null,
+      "clearance": "Victoza (1.8 mg/day, T2D): mean apparent clearance approximately 1.2 L/h after a single subcutaneous dose. Saxenda (3 mg/day, obesity): mean apparent clearance approximately 0.9 to 1.4 L/h. EU Victoza SmPC also states 1.2 L/h; EU Saxenda SmPC states 0.9-1.4 L/h.",
+      "volume_of_distribution": "Victoza: mean apparent volume of distribution approximately 13 L after SC 0.6 mg; EU SmPC states 11-17 L. Saxenda: mean apparent volume of distribution 20 to 25 L after SC 3 mg (approximately 100 kg person). Volume of distribution after intravenous administration is 0.07 L/kg (both products).",
+      "dose_steps_mg": [
+        0.6,
+        1.2,
+        1.8
+      ],
+      "interval_days": 1,
+      "brand_names": [
+        "Victoza",
+        "Saxenda"
+      ],
+      "elimination_after_last_dose": "NOT STATED. Neither the Victoza nor the Saxenda label contains any sentence about how long liraglutide remains in the circulation after the last dose. The only elimination timing wording is: 'Only a minor part of the administered radioactivity was excreted as liraglutide-related metabolites in urine or feces (6% and 5%, respectively). The majority of urine and feces radioactivity was excreted during the first 6 to 8 days.'",
+      "sources": [
+        {
+          "claim": "DAILY dosing - Victoza tmax 8 to 12 hours post dose",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2025/022341s046lbl.pdf",
+          "quote": "Following subcutaneous administration, maximum concentrations of liraglutide are achieved at 8 to 12 hours post dosing."
+        },
+        {
+          "claim": "Victoza absolute subcutaneous bioavailability approximately 55%",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2025/022341s046lbl.pdf",
+          "quote": "Absolute bioavailability of liraglutide following subcutaneous administration is approximately 55%."
+        },
+        {
+          "claim": "Victoza apparent volume of distribution approximately 13 L (SC 0.6 mg) and 0.07 L/kg (IV)",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2025/022341s046lbl.pdf",
+          "quote": "The mean apparent volume of distribution after subcutaneous administration of VICTOZA 0.6 mg is approximately 13 L. The mean volume of distribution after intravenous administration of VICTOZA is 0.07 L/kg."
+        },
+        {
+          "claim": "Victoza mean apparent clearance approximately 1.2 L/h and elimination half-life approximately 13 hours",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2025/022341s046lbl.pdf",
+          "quote": "The mean apparent clearance following subcutaneous administration of a single dose of liraglutide is approximately 1.2 L/h with an elimination half-life of approximately 13 hours."
+        },
+        {
+          "claim": "Victoza dose escalation is DAILY: 0.6 mg once daily for one week, then 1.2 mg, then up to 1.8 mg once daily",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2025/022341s046lbl.pdf",
+          "quote": "After one week at the 0.6 mg once daily dosage, increase the dosage to 1.2 mg injected subcutaneously once daily."
+        },
+        {
+          "claim": "Victoza maximum dosage 1.8 mg once daily (daily interval)",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2025/022341s046lbl.pdf",
+          "quote": "If additional glycemic control is required, increase the dosage to the maximum recommended dosage of 1.8 mg injected subcutaneously once daily after at least one week of treatment with the 1.2 mg once daily dosage."
+        },
+        {
+          "claim": "Victoza missed-dose rule confirms the daily dosing interval (reinitiate if >3 days elapsed)",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2025/022341s046lbl.pdf",
+          "quote": "If more than 3 days have elapsed since the last VICTOZA dose, reinitiate VICTOZA at 0.6 mg once daily to reduce the risk of gastrointestinal adverse reactions associated with reinitiation of treatment."
+        },
+        {
+          "claim": "Saxenda (obesity, 3 mg): tmax approximately 11 hours post dosing",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/206321Orig1s024lbl.pdf",
+          "quote": "Absorption - Following subcutaneous administration, maximum concentrations of liraglutide are achieved at 11 hours post dosing."
+        },
+        {
+          "claim": "Saxenda plasma half-life is 13 hours after subcutaneous administration, and the PK profile makes it suitable for once-daily administration",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/206321Orig1s024lbl.pdf",
+          "quote": "Unlike native GLP-1, liraglutide is stable against metabolic degradation by both peptidases and has a plasma half-life of 13 hours after subcutaneous administration. The pharmacokinetic profile of liraglutide, which makes it suitable for once-daily administration, is a result of self-association that delays absorption, plasma protein binding, and stability against metabolic degradation by DPP-4 and NEP."
+        },
+        {
+          "claim": "Saxenda apparent volume of distribution 20 to 25 L (SC 3 mg)",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/206321Orig1s024lbl.pdf",
+          "quote": "Distribution - The mean apparent volume of distribution after subcutaneous administration of liraglutide 3 mg is 20 to 25L (for a person weighing approximately 100 kg)."
+        },
+        {
+          "claim": "Saxenda mean apparent clearance 0.9 to 1.4 L/h and elimination half-life approximately 13 hours",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/206321Orig1s024lbl.pdf",
+          "quote": "The mean apparent clearance following subcutaneous administration of a single dose of liraglutide is approximately 0.9 to 1.4 L/h with an elimination half-life of approximately 13 hours, making liraglutide suitable for once daily administration."
+        },
+        {
+          "claim": "Saxenda dose escalation table: week 1 = 0.6 mg, week 2 = 1.2 mg, week 3 = 1.8 mg, week 4 = 2.4 mg, week 5 and onward = 3 mg, all DAILY",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/206321Orig1s024lbl.pdf",
+          "quote": "Table 1. Dosage Escalation Schedule"
+        },
+        {
+          "claim": "Saxenda recommended maintenance dosage is 3 mg daily; lower doses are titration only",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/206321Orig1s024lbl.pdf",
+          "quote": "For adults, the recommended dosage of SAXENDA is 3 mg daily, lower dosages are for titration only."
+        },
+        {
+          "claim": "EU Victoza SmPC section 5.2: tmax 8-12 h, volume of distribution 11-17 L, clearance approximately 1.2 L/h, half-life approximately 13 hours",
+          "url": "https://www.ema.europa.eu/en/documents/product-information/victoza-epar-product-information_en.pdf",
+          "quote": "The absorption of liraglutide following subcutaneous administration is slow, reaching maximum concentration 8–12 hours post dosing."
+        },
+        {
+          "claim": "EU Victoza SmPC elimination wording",
+          "url": "https://www.ema.europa.eu/en/documents/product-information/victoza-epar-product-information_en.pdf",
+          "quote": "The mean clearance following subcutaneous administration of a single dose liraglutide is approximately 1.2 l/h with an elimination half-life of approximately 13 hours."
+        },
+        {
+          "claim": "EU Saxenda SmPC section 5.2: tmax approximately 11 h, apparent volume of distribution 20-25 L, clearance 0.9-1.4 L/h, half-life approximately 13 hours",
+          "url": "https://www.ema.europa.eu/en/documents/product-information/saxenda-epar-product-information_en.pdf",
+          "quote": "The absorption of liraglutide following subcutaneous administration was slow, reaching maximum concentration approximately 11 hours post dosing."
+        },
+        {
+          "claim": "EU Saxenda SmPC elimination wording",
+          "url": "https://www.ema.europa.eu/en/documents/product-information/saxenda-epar-product-information_en.pdf",
+          "quote": "The mean clearance following subcutaneous administration of liraglutide is approximately 0.9-1.4 L/h with an elimination half-life of approximately 13 hours."
+        }
+      ],
+      "confidence": "high",
+      "notes": "CRITICAL for a weekly-interval PK model: liraglutide is DAILY dosed (interval_days = 1), not weekly; a 7-day dosing assumption is invalid for this drug. With a ~13 h half-life, steady state is reached in roughly 2-3 days on pharmacokinetic grounds, but NO source states a time to steady state, so steady_state_weeks is null rather than computed. accumulation_ratio is NOT reported in any label or SmPC -> null. tmax_hours = 8 is the LOWER bound of Victoza's stated 8-12 h range; Saxenda states a single value of 11 h - both are given in the sources. Victoza and Saxenda are the SAME molecule at different doses/indications; the obesity product is Saxenda 3 mg daily. No 'circulation for X weeks after the last dose' statement exists in either label."
+    },
+    "dulaglutide": {
+      "half_life_hours": 120,
+      "half_life_range_hours": null,
+      "tmax_hours": 48,
+      "bioavailability_pct": 47,
+      "steady_state_weeks": 2,
+      "accumulation_ratio": 1.56,
+      "clearance": "0.142 L/h, apparent population mean clearance (Trulicity label section 12.3; identical value in the EU SmPC).",
+      "volume_of_distribution": "Apparent population mean central volume of distribution 3.09 L and apparent population mean peripheral volume of distribution 5.98 L (no single combined Vd figure is reported).",
+      "dose_steps_mg": [
+        0.75,
+        1.5,
+        3,
+        4.5
+      ],
+      "interval_days": 7,
+      "brand_names": [
+        "Trulicity"
+      ],
+      "elimination_after_last_dose": "NOT STATED. No sentence in the Trulicity label or EU SmPC describes how long dulaglutide remains in the circulation after the last dose. The only related wording is the missed-dose rule: 'The day of weekly administration can be changed, if necessary, as long as the last dose was administered 3 or more days before.'",
+      "sources": [
+        {
+          "claim": "tmax at steady state 24 to 72 hours (median 48 hours); accumulation ratio approximately 1.56; steady state achieved between 2 and 4 weeks",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/125469s065lbl.pdf",
+          "quote": "Following subcutaneous administration, the time to maximum plasma concentration of dulaglutide at steady state ranges from 24 to 72 hours, with a median of 48 hours. After reaching steady state, the accumulation ratio was approximately 1.56. Steady-state plasma dulaglutide concentrations were achieved between 2 and 4 weeks following once weekly administration."
+        },
+        {
+          "claim": "Mean absolute subcutaneous bioavailability 65% at 0.75 mg and 47% at 1.5 mg; 3 mg and 4.5 mg estimated similar to 1.5 mg but not specifically studied",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/125469s065lbl.pdf",
+          "quote": "Absorption – The mean absolute bioavailability of dulaglutide following subcutaneous administration of single 0.75 mg and 1.5 mg doses was 65% and 47%, respectively. Absolute subcutaneous bioavailability for 3 mg and 4.5 mg doses were estimated to be similar to 1.5 mg although this has not been specifically studied."
+        },
+        {
+          "claim": "Apparent population mean central Vd 3.09 L and peripheral Vd 5.98 L",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/125469s065lbl.pdf",
+          "quote": "Distribution – Apparent population mean central volume of distribution was 3.09 L and the apparent population mean peripheral volume of distribution was 5.98 L."
+        },
+        {
+          "claim": "Apparent population mean clearance 0.142 L/h and elimination half-life approximately 5 days",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/125469s065lbl.pdf",
+          "quote": "The apparent population mean clearance of dulaglutide was 0.142 L/h. The elimination half-life of dulaglutide was approximately 5 days."
+        },
+        {
+          "claim": "Dose escalation: start 0.75 mg once weekly, may increase to 1.5 mg after 4 weeks, then 1.5 mg increments, maximum 4.5 mg once weekly",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/125469s065lbl.pdf",
+          "quote": "The recommended starting dosage of TRULICITY is 0.75 mg injected subcutaneously once weekly. Follow the dosage escalation below to reduce the risk of gastrointestinal adverse reactions"
+        },
+        {
+          "claim": "Maximum recommended dosage 4.5 mg once weekly",
+          "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/125469s065lbl.pdf",
+          "quote": "The maximum recommended dosage is 4.5 mg injected subcutaneously once weekly."
+        },
+        {
+          "claim": "EU SmPC section 5.2: peak plasma concentrations at 48 hours; steady state between 2 and 4 weeks; bioavailability 47% (1.5 mg) and 65% (0.75 mg); clearance 0.142 L/h; half-life approximately 5 days",
+          "url": "https://www.ema.europa.eu/en/documents/product-information/trulicity-epar-product-information_en.pdf",
+          "quote": "Following subcutaneous administration to patients with type 2 diabetes, dulaglutide reaches peak plasma concentrations in 48 hours."
+        },
+        {
+          "claim": "EU SmPC steady state and bioavailability wording",
+          "url": "https://www.ema.europa.eu/en/documents/product-information/trulicity-epar-product-information_en.pdf",
+          "quote": "Steady-state plasma concentrations were achieved between 2 to 4 weeks of once-weekly administration of dulaglutide (1.5 mg)."
+        },
+        {
+          "claim": "EU SmPC elimination wording",
+          "url": "https://www.ema.europa.eu/en/documents/product-information/trulicity-epar-product-information_en.pdf",
+          "quote": "Apparent population mean clearance of dulaglutide was 0.142 L/h. and the elimination half-life was approximately 5 days."
+        },
+        {
+          "claim": "EU SmPC section 5.1 reports a prolonged half-life of 4.7 days for the molecule (slightly different from the 5-day figure in section 5.2)",
+          "url": "https://www.ema.europa.eu/en/documents/product-information/trulicity-epar-product-information_en.pdf",
+          "quote": "features result in a soluble formulation and a prolonged half-life of 4.7 days, which makes it suitable"
+        }
+      ],
+      "confidence": "high",
+      "notes": "dulaglutide is approved for type 2 diabetes only, NOT for weight management - it is included here for PK comparison only. half_life_hours = 120 is a unit conversion of the verbatim 'approximately 5 days'; the EU SmPC elsewhere states 4.7 days (113 h) - both are quoted, and the 5-day figure was used. bioavailability_pct = 47 is the value for the 1.5 mg dose (the usual maintenance dose); the label also reports 65% at 0.75 mg, and explicitly says 3 mg and 4.5 mg bioavailabilities were NOT specifically studied. tmax_hours = 48 is the stated MEDIAN of the 24-72 h range (the label gives an explicit median for dulaglutide, unlike semaglutide/liraglutide). steady_state_weeks = 2 is the LOWER bound of the stated '2 and 4 weeks'. accumulation_ratio 1.56 is one of the few explicitly reported accumulation ratios in this drug class."
+    },
+    "retatrutide": {
+      "half_life_hours": 144,
+      "half_life_range_hours": null,
+      "tmax_hours": 24,
+      "bioavailability_pct": null,
+      "steady_state_weeks": null,
+      "accumulation_ratio": null,
+      "clearance": null,
+      "volume_of_distribution": null,
+      "dose_steps_mg": [
+        1,
+        4,
+        8,
+        12
+      ],
+      "interval_days": 7,
+      "brand_names": [],
+      "elimination_after_last_dose": "NOT ESTABLISHED. No label or SmPC exists (investigational). The only human elimination data come from a 4-participant antidoping study in which retatrutide remained DETECTABLE in plasma (not necessarily active or at therapeutic levels) at 1344 h (56 days) after the first of two 2 mg subcutaneous doses; the authors state: 'The extended plasma detection window, approximately 56 days after the first dose, supports plasma-based testing...'. Detection is not the same as elimination and no elimination time is defined.",
+      "sources": [
+        {
+          "claim": "Half-life approximately 6 days in humans (stated in the introduction of a peer-reviewed human PK/detection study)",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13578828/",
+          "quote": "This modification promotes reversible noncovalent binding to serum albumin, resulting in an extended half‐life of approximately 6 days in humans by reducing renal filtration and proteolytic degradation"
+        },
+        {
+          "claim": "tmax after subcutaneous dosing in humans: peak plasma levels typically 24 to 48 h after the first dose (n=4, 2 mg SC on days 1 and 7)",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13578828/",
+          "quote": "Detectable concentrations of retatrutide were observed at 2 h postadministration in all volunteers, with peak plasma levels typically occurring between 24 and 48 h after the first dose and showing marked interindividual variability."
+        },
+        {
+          "claim": "Prolonged, depot-like subcutaneous absorption; retatrutide still detectable at 56 days after the first dose",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13578828/",
+          "quote": "At the final sampling point at 1344 h (56 days) after the first dose, corresponding to 1176 h (49 days) after the second dose, all participants still had detectable analyte concentrations of 7.1–38.4 ng/mL."
+        },
+        {
+          "claim": "Large interindividual variability in peak concentration after the same 2 mg subcutaneous dose",
+          "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13578828/",
+          "quote": "Marked interindividual variability was observed in peak concentrations (C max at 24 h: 128.6–892.3 ng/mL across volunteers), consistent with known variability in subcutaneous absorption, body composition, and individual albumin-binding capacity."
+        },
+        {
+          "claim": "Phase 2 obesity trial dosing: once-weekly subcutaneous retatrutide at 1, 4, 8 or 12 mg maintenance doses, with 2 mg or 4 mg starting doses",
+          "url": "https://doi.org/10.1056/NEJMoa2301972",
+          "quote": "Participants were randomly assigned in a 2:1:1:1:1:2:2 ratio to receive subcutaneous retatrutide (1 mg, 4 mg [initial dose, 2 mg], 4 mg [initial dose, 4 mg], 8 mg [initial dose, 2 mg], 8 mg [initial dose, 4 mg], or 12 mg [initial dose, 2 mg]) or placebo once weekly for 48 weeks."
+        },
+        {
+          "claim": "A lower starting dose (2 mg vs 4 mg) partially mitigated the dose-related gastrointestinal adverse events",
+          "url": "https://doi.org/10.1056/NEJMoa2301972",
+          "quote": "The most common adverse events in the retatrutide groups were gastrointestinal; these events were dose-related, were mostly mild to moderate in severity, and were partially mitigated with a lower starting dose (2 mg vs. 4 mg)."
+        },
+        {
+          "claim": "The phase 2 dose-finding publication reports efficacy and safety, not half-life, tmax, clearance, volume of distribution, bioavailability, time to steady state or accumulation ratio",
+          "url": "https://doi.org/10.1056/NEJMoa2301972",
+          "quote": "In adults with obesity, retatrutide treatment for 48 weeks resulted in substantial reductions in body weight"
+        }
+      ],
+      "confidence": "low",
+      "notes": "RETATRUTIDE IS INVESTIGATIONAL: it is not approved by the FDA, EMA or NMPA, has no prescribing information, and no brand name (brand_names is therefore an empty list, not a missing value). What is NOT established: absolute/subcutaneous bioavailability (null), time to steady state (null), accumulation ratio (null), apparent clearance (null) and volume of distribution (null) - none of these is reported in any source located. half_life_hours = 144 is a unit conversion of 'approximately 6 days'; the figure appears in the INTRODUCTION of the 2026 Rapid Communications in Mass Spectrometry paper, attributed to Coskun et al. Cell Metab 2022 (doi:10.1016/j.cmet.2022.07.013), whose full text was paywalled and could NOT be checked directly - so the 6-day value is a secondary quotation, not a verified primary measurement. The tmax value comes from a 4-participant non-regulatory study in which participants SELF-ADMINISTERED product obtained from a non-pharmaceutical source ('Retatrutide (LY3437943; purity >= 95%) was obtained from Ozel Form (Istanbul, Turkey)'), with no pharmacokinetic sampling between 168 h and 336 h; treat tmax_hours = 24 as the LOWER bound of a very imprecise 24-48 h observation. The 56-day figure is a plasma DETECTION window, not an elimination time."
+    }
+  },
+  "gi_side_effects": {
+    "tirzepatide": {
+      "nausea_pct": 28,
+      "vomiting_pct": 13,
+      "diarrhoea_pct": 23,
+      "constipation_pct": 11,
+      "placebo": {
+        "nausea_pct": 8,
+        "vomiting_pct": 2,
+        "diarrhoea_pct": 8,
+        "constipation_pct": 5
+      },
+      "trial": "SURMOUNT (obesity/overweight): pooled 2 randomised, double-blind, placebo-controlled trials = SURMOUNT-1 + SURMOUNT-2, Zepbound label section 6.1, Table 2. Values shown are the ZEPBOUND 15 mg arm (N=941) vs placebo (N=958).",
+      "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2024/217806s003lbl.pdf",
+      "notes": "Full dose-response in the same table (placebo / 5 mg / 10 mg / 15 mg): nausea 8/25/29/28%; diarrhoea 8/19/21/23%; vomiting 2/8/11/13%; constipation 5/17/14/11%. Any GI adverse reaction: placebo 30% vs 56% at every Zepbound dose. GI-related discontinuation: placebo 0.5%, 5 mg 1.9%, 10 mg 3.3%, 15 mg 4.3%. For type 2 diabetes (SURPASS programme), the Mounjaro label Table 1 pooled placebo-controlled adult T2D trials give (placebo / 5 mg / 10 mg / 15 mg): nausea 4/12/15/18%; diarrhoea 9/12/13/17%; vomiting 2/5/5/9%; constipation 1/6/6/7%. Nausea is therefore markedly more common in the obesity trials than in the T2D trials at the same doses."
+    },
+    "semaglutide": {
+      "nausea_pct": 44,
+      "vomiting_pct": 24,
+      "diarrhoea_pct": 30,
+      "constipation_pct": 24,
+      "placebo": {
+        "nausea_pct": 16,
+        "vomiting_pct": 6,
+        "diarrhoea_pct": 16,
+        "constipation_pct": 11
+      },
+      "trial": "Wegovy 2.4 mg (obesity/overweight): pooled 3 randomised, double-blind, placebo-controlled trials, Wegovy label section 6.1, Table 3. N=2,116 (Wegovy 2.4 mg) vs N=1,261 (placebo), up to 68 weeks.",
+      "url": "https://www.accessdata.fda.gov/drugsatfda_docs/label/2026/215256s025lbl.pdf",
+      "notes": "These are the Wegovy 2.4 mg (weight-management) figures. The corresponding Ozempic 1 mg T2D figures are much lower - the Ozempic label reports any gastrointestinal adverse reaction in 30.8% at 1 mg and 34% at 2 mg. Semaglutide 2.4 mg has the highest reported nausea incidence of the drugs in this set (44%), higher than tirzepatide 15 mg (28%) in SURMOUNT."
+    },
+    "onset_and_attenuation": "REGULATORY WORDING (strongest evidence). Tirzepatide: the Zepbound label states 'The majority of nausea, vomiting, and/or diarrhea events occurred during dose escalation and decreased over time.' The Mounjaro label states 'The majority of reports of nausea, vomiting, and/or diarrhea occurred during dose escalation and decreased over time.' Neither the Wegovy nor the Ozempic label contains an equivalent 'decreased over time' sentence (searched; absent). PEAK TIMING: a 2026 peer-reviewed narrative review of GI adverse effects of GLP-1 RAs and dual GIP/GLP-1 RAs states 'Symptoms peak within the 1st week of initiation or dose escalation and decrease with continued use' and that the events are 'typically during initiation and dose escalation' (Garg et al., Nutr Clin Pract 2026, doi:10.1002/ncp.70180). ATTENUATION / TOLERANCE: a 2026 quantitative analysis of dose-escalation regimens in T2D (Nauck et al., Diabetes Obes Metab 2026, doi:10.1111/dom.70613) found that after completing the recommended dose-escalation regimens, '2-5-fold higher doses of semaglutide and tirzepatide can be tolerated', and that tolerance for nausea/vomiting was significantly associated with a longer dose-escalation period and a greater number of escalation steps; the same analysis found NO such tolerance development for dulaglutide, exenatide once weekly, albiglutide, liraglutide, exenatide twice daily or lixisenatide. MITIGATION: the same 2026 review states 'Slow dose escalation, which is advancing no faster than monthly, is the single most robust mitigation strategy'. NOT FOUND: no source located gives a quantitative statement of the DURATION of an individual nausea episode, and none gives a peak time in hours after a single injection (e.g. '24-48 h post-dose'); both are explicitly unverified. CAVEAT: the two 2026 papers are peer-reviewed reviews/analyses, not primary trial data; the label statements are regulatory primary wording but are qualitative, not quantitative."
+  },
+  "body_composition": {
+    "tirzepatide_lean_mass_pct": 25,
+    "semaglutide_lean_mass_pct": null,
+    "protein_recommendation_g_per_kg": 1.2,
+    "sources": [
+      {
+        "claim": "SURMOUNT-1 DXA body-composition substudy: of the body weight lost, approximately 75% was fat mass and approximately 25% was lean mass, for BOTH tirzepatide and placebo",
+        "url": "https://doi.org/10.1111/dom.16275",
+        "quote": "Of the body weight lost, approximately 75% was fat mass and 25% was lean mass for both tirzepatide and placebo."
+      },
+      {
+        "claim": "SURMOUNT-1 DXA substudy design and headline changes (n=160 of 2539; pooled tirzepatide n=124, placebo n=36; DXA at baseline and Week 72)",
+        "url": "https://doi.org/10.1111/dom.16275",
+        "quote": "The change in body weight, fat mass and lean mass from baseline to Week 72 was -21.3%, -33.9% and -10.9% with tirzepatide and -5.3%, -8.2% and -2.6% with placebo, respectively (p < 0.001 for all comparisons)."
+      },
+      {
+        "claim": "SURMOUNT-1 DXA substudy population and method",
+        "url": "https://doi.org/10.1111/dom.16275",
+        "quote": "Substudy participants (n = 160 of the 2539 in SURMOUNT-1) underwent dual-energy X-ray absorptiometry (DXA) at baseline and Week 72."
+      },
+      {
+        "claim": "STEP 1 DEXA body-composition exploratory analysis (the semaglutide counterpart): body weight changed -15.0%, total fat mass -19.3%, regional visceral fat mass -27.4%",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8089287/",
+        "quote": "Percentage change in body weight from baseline to week 68 was -15.0% with semaglutide vs -3.6% with placebo. This resulted in reductions from baseline with semaglutide in total fat mass (-19.3%) and regional visceral fat mass (-27.4%), leading to 3.5%-point and 2.0%-point reductions in the proportions of total fat mass and visceral fat mass, respectively."
+      },
+      {
+        "claim": "STEP 1 DEXA substudy: percent CHANGE in lean body mass was -9.7% while body weight changed -15.0%; the paper does NOT report the proportion of weight lost that was lean mass",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8089287/",
+        "quote": "Total lean body mass decreased from baseline (-9.7%); however, the proportion relative to total body mass increased by 3.0%-points."
+      },
+      {
+        "claim": "STEP 1 DEXA substudy size, method and duration (n=140; semaglutide n=95, placebo n=45; DEXA, 68 weeks)",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8089287/",
+        "quote": "This analysis included 140 participants (semaglutide n=95; placebo n=45) (mean weight 98.4 kg, BMI 34.8 kg/m2; 76% female)."
+      },
+      {
+        "claim": "PROTEIN TARGET: joint advisory of the American College of Lifestyle Medicine, American Society for Nutrition, Obesity Medicine Association and The Obesity Society recommends 1.2-1.6 g/kg body weight/day during active weight reduction",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12264624/",
+        "quote": "Higher targets, such as 1.2–1.6 g/kg body weight/day, have also been proposed during active weight reduction."
+      },
+      {
+        "claim": "PROTEIN TARGET, unit basis is contested: for people with obesity it is unclear whether targets should use actual, adjusted/ideal body weight or fat-free mass; the advisory notes 1.2-2.0 g/kg of ADJUSTED body weight/day is used during major weight reduction, and 1.5 g/kg of fat-free mass/day is 'considered more accurate'",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12264624/",
+        "quote": "For individuals with obesity, it's unclear whether these goals should be based on actual body weight, corrected (adjusted or ideal) body weight, or fat-free mass, as the use of actual weight can significantly overestimate protein requirements. For example, protein recommendations during major weight reduction are based on adjusted body weight range between 1.2 and 2.0 g/kg of adjusted body weight/day."
+      },
+      {
+        "claim": "PROTEIN TARGET: absolute alternative of 80-120 g/day; safe lower bound 0.4-0.5 g/kg/day; avoid prolonged intake above 2 g/kg/day",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12264624/",
+        "quote": "Protein intake in adults should not fall below 0.4–0.5 g/kg/day, as this can lead to muscle atrophy and functional impairments, while prolonged intake above 2 g/kg/day should be avoided due to potential adverse health effects."
+      },
+      {
+        "claim": "Muscle-mass loss as a share of total weight reduction in the absence of structured strength training (modelling data cited by the advisory): 10-15% in women and 20-25% in men",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12264624/",
+        "quote": "Modeling data suggest that loss of muscle mass varies by sex, representing 10–15 % of total weight reduction in women and 20–25 % of total weight reduction in men, in the absence of structured strength training."
+      },
+      {
+        "claim": "Greater weight loss during GLP-1 therapy is associated with a more favourable lean:fat ratio in STEP 1",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8089287/",
+        "quote": "An increasing improvement in lean body mass:fat mass ratio was seen with semaglutide with increasing weight loss from baseline to week 68 (continuous data)."
+      }
+    ],
+    "notes": "TWO DIFFERENT QUANTITIES ARE OFTEN CONFLATED - both are given here explicitly. (a) 'percent of TOTAL WEIGHT LOST that was lean mass': verified for tirzepatide as approximately 25% (SURMOUNT-1 DXA substudy, n=160, published 2025 in Diabetes Obes Metab, doi:10.1111/dom.16275 - note: an earlier widely-circulated DOI 10.1111/dom.15391 for this substudy could NOT be verified and is not used). (b) 'percent CHANGE IN LEAN MASS from baseline': tirzepatide -10.9% (pooled doses) vs placebo -2.6% in the same substudy; semaglutide -9.7% vs placebo in the STEP 1 DEXA substudy. For SEMAGLUTIDE, quantity (a) could NOT be verified from the STEP 1 DEXA substudy - that abstract reports only the -9.7% lean-mass change, the -15.0% weight change and a +3.0 percentage-point increase in the lean-mass PROPORTION of body mass. semaglutide_lean_mass_pct is therefore null rather than estimated; do not compute it by dividing -9.7 by -15.0, as those are percentages of different baselines. Two secondary/aggregate sources exist but were deliberately NOT used as the primary number because they are not drug-specific primary trial data: a 2026 meta-analysis of 7 RCTs (n=821, doi:10.1038/s41366-026-02118-y) and a 2026 review of 40 DXA reports (mean fat-free-mass loss 29.1%, SD 19.0%, doi:10.1002/oby.70212). PROTEIN: the numeric field holds 1.2 g/kg/day because the schema requires a single number and 1.2 is the LOWER BOUND of the advisory's explicitly stated 1.2-1.6 g/kg body weight/day range for active weight reduction; it is NOT a midpoint or a point estimate. The same advisory also gives 1.2-2.0 g/kg ADJUSTED body weight/day and 1.5 g/kg fat-free mass/day, and states there is NO consensus on which body-weight basis to use. The STEP 1 body-composition analysis is a conference abstract (J Endocr Soc 2021;5(Suppl 1):A16, PMCID PMC8089287) - the only open-access version located; no full peer-reviewed paper for it was found."
+  }
+}

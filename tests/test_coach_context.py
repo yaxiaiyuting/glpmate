@@ -136,3 +136,46 @@ class CoachContextTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class MessageWindowTest(unittest.TestCase):
+    """`messages(limit=N)` 必须返回**最近**的 N 条，不是最早的 N 条。
+
+    这是另一个真实故障：旧实现用 `ORDER BY at ASC ... LIMIT N`，
+    于是教练取 12 条历史时拿到的是最早那 12 条——对话一旦超过 12 条，
+    它就再也看不到用户最近说的话，表现成"答非所问"。
+    因为出错的地方不在"能不能跑通"，而在"取到的内容对不对"，
+    所以必须专门断言内容，光断言不抛异常是抓不到的。
+    """
+
+    def setUp(self) -> None:
+        self.tmp = pathlib.Path(tempfile.mkdtemp())
+        self.store = Store(self.tmp / "t.db")
+
+    def tearDown(self) -> None:
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _fill(self, n: int) -> None:
+        for i in range(1, n + 1):
+            self.store.add_message("user" if i % 2 else "assistant", f"第{i}条")
+
+    def test_returns_newest_not_oldest(self):
+        self._fill(20)
+        got = [m["text"] for m in self.store.messages(limit=4)]
+        self.assertEqual(got, ["第17条", "第18条", "第19条", "第20条"])
+
+    def test_result_is_in_ascending_order(self):
+        """顺序仍要是从早到晚——提示词和界面都依赖这个顺序。"""
+        self._fill(20)
+        rows = self.store.messages(limit=6)
+        self.assertEqual([r["id"] for r in rows], sorted(r["id"] for r in rows))
+
+    def test_limit_larger_than_total_returns_all(self):
+        self._fill(5)
+        self.assertEqual(len(self.store.messages(limit=100)), 5)
+
+    def test_coach_history_window_sees_the_latest_message(self):
+        """把两个故障串起来：教练的历史窗口里必须有最后一条用户消息。"""
+        self._fill(30)
+        self.store.add_message("user", "我现在体内水平多少")
+        history = [m["text"] for m in self.store.messages(limit=12)]
+        self.assertIn("我现在体内水平多少", history)

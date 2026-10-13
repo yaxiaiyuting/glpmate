@@ -692,13 +692,27 @@ class Store:
         return _row_to_message(row) if row else None
 
     def messages(self, limit: int = 200, since: Optional[date] = None) -> list[dict[str, Any]]:
-        sql = "SELECT * FROM coach_messages WHERE 1=1"
+        """最近 [limit] 条消息，按时间**升序**返回（最老的在前）。
+
+        ============ 这里曾经取反了（别再改回 ASC + LIMIT）============
+        旧写法是 `ORDER BY at ASC, id ASC LIMIT ?`，也就是"按时间升序取前 N 条"
+        ——拿到的是**最早**的 N 条，而不是最近的 N 条。
+
+        后果不容易发现但很致命：`reply()` 取 `limit=12` 当对话历史，于是对话
+        一旦超过 12 条，教练就再也看不到用户最近说的话，只会拿十几轮之前的
+        上下文回答。表面现象是"教练答非所问"，很难联想到是取数顺序的问题。
+
+        正确做法是先按时间**降序**取最近的 N 条，再在外层翻回升序，
+        这样既能拿到最近的，顺序也对（提示词要求时间从早到晚）。
+        """
+        inner = "SELECT * FROM coach_messages WHERE 1=1"
         params: list[Any] = []
         if since:
-            sql += " AND day >= ?"
+            inner += " AND day >= ?"
             params.append(since.isoformat())
-        sql += " ORDER BY at ASC, id ASC LIMIT ?"
+        inner += " ORDER BY at DESC, id DESC LIMIT ?"
         params.append(limit)
+        sql = f"SELECT * FROM ({inner}) ORDER BY at ASC, id ASC"
         return [_row_to_message(r) for r in self.db.query(sql, params)]
 
     def clear_messages(self) -> int:

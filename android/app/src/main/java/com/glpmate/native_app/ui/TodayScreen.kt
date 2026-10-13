@@ -79,6 +79,8 @@ fun TodayScreen(
         SectionHead("今日你的记录")
         FeelingCard(data)
         MealCard(data, onOpenFood)
+        // 营养达标紧跟餐食卡：用户刚记完一餐，最想知道的就是"今天够了没有"
+        NutritionCard(data.nutrition)
         WaterCard(data, busy, onAddWater)
         CompletedCard(data)
         HalfCards(data)

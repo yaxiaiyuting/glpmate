@@ -344,6 +344,8 @@ data class Bootstrap(
     val scheduleJson: String?,
     /** BMI（身高没填时 bmi 为 null）。 */
     val bmi: BmiInfo?,
+    /** 营养达标（对照《中国居民膳食指南（2022）》）。 */
+    val nutrition: Nutrition?,
 ) {
     companion object {
         fun from(o: JSONObject): Bootstrap {
@@ -370,6 +372,7 @@ data class Bootstrap(
                 sideEffectChips = chips,
                 scheduleJson = o.optJSONArray("schedule")?.toString(),
                 bmi = BmiInfo.from(o.optJSONObject("bmi")),
+                nutrition = Nutrition.from(o.optJSONObject("nutrition")),
             )
         }
     }
@@ -553,6 +556,138 @@ data class CoachMessage(
                 time = o.optString("time"),
                 card = card,
                 isError = meta?.optBoolean("error", false) ?: false,
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------- 营养达标
+/**
+ * 一个"摄入量 vs 推荐区间"的进度条数据。
+ *
+ * 注意 min/good 是**推荐区间的下限和理想值**（不是一个点目标）：
+ * 蛋白质和纤维都是"够了就行"，超过下限才算达标。
+ */
+data class NutrientBar(
+    val value: Double,
+    val min: Double,
+    val good: Double,
+    val pctOfGood: Double,
+    val reachedMin: Boolean,
+    val reachedGood: Boolean,
+) {
+    companion object {
+        fun from(o: JSONObject?): NutrientBar? {
+            if (o == null) return null
+            fun n(k: String) = if (o.isNull(k)) 0.0 else o.optDouble(k, 0.0)
+            return NutrientBar(
+                value = n("value"),
+                min = n("min"),
+                good = n("good"),
+                pctOfGood = n("pct_of_good"),
+                reachedMin = o.optBoolean("reached_min", false),
+                reachedGood = o.optBoolean("reached_good", false),
+            )
+        }
+    }
+}
+
+/** 三大宏量营养素的供能比是否落在指南区间内。 */
+data class AmdrPart(val pct: Double, val min: Double, val max: Double, val verdict: String) {
+    val isOk: Boolean get() = verdict == "ok"
+    val isLow: Boolean get() = verdict == "low"
+    val isHigh: Boolean get() = verdict == "high"
+
+    companion object {
+        fun from(o: JSONObject?): AmdrPart? {
+            if (o == null || !o.optBoolean("has_data", true)) return null
+            if (o.isNull("pct")) return null
+            return AmdrPart(
+                pct = o.optDouble("pct", 0.0),
+                min = o.optDouble("min", 0.0),
+                max = o.optDouble("max", 0.0),
+                verdict = o.optString("verdict", "ok"),
+            )
+        }
+    }
+}
+
+/** 热量缺口。 */
+data class Deficit(
+    val value: Double,
+    val weeklyKg: Double,
+    val verdict: String,
+    val note: String,
+    val formula: String,
+)
+
+/** 需要补充的营养素。 */
+data class NutritionGap(val key: String, val label: String, val need: Double, val unit: String, val hint: String) {
+    companion object {
+        fun from(o: JSONObject) = NutritionGap(
+            key = o.optString("key"),
+            label = o.optString("label"),
+            need = o.optDouble("need", 0.0),
+            unit = o.optString("unit"),
+            hint = o.optString("hint"),
+        )
+    }
+}
+
+/**
+ * 全天营养达标情况（对照《中国居民膳食指南（2022）》）。
+ *
+ * 这份数据的设计重点不是"超标了没有"，而是"**够了没有**"：
+ * GLP-1 用药期间最常见的问题是被食欲抑制到吃太少、蛋白质不足，
+ * 结果是掉肌肉而不是掉脂肪。
+ */
+data class Nutrition(
+    val kcalValue: Double,
+    val kcalTarget: Double,
+    val kcalPct: Double?,
+    val protein: NutrientBar?,
+    val fiber: NutrientBar?,
+    val proteinBasis: String,
+    val proteinBasisNote: String?,
+    val carb: AmdrPart?,
+    val fat: AmdrPart?,
+    val proteinShare: AmdrPart?,
+    val deficit: Deficit?,
+    val gaps: List<NutritionGap>,
+    val hasData: Boolean,
+) {
+    companion object {
+        fun from(o: JSONObject?): Nutrition? {
+            if (o == null) return null
+            val kcal = o.optJSONObject("kcal")
+            val amdr = o.optJSONObject("amdr")
+            val d = o.optJSONObject("deficit")
+            val gaps = mutableListOf<NutritionGap>()
+            o.optJSONArray("gaps")?.let { arr ->
+                for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { gaps.add(NutritionGap.from(it)) }
+            }
+            return Nutrition(
+                kcalValue = kcal?.optDouble("value", 0.0) ?: 0.0,
+                kcalTarget = kcal?.optDouble("target", 0.0) ?: 0.0,
+                kcalPct = kcal?.let { if (it.isNull("pct")) null else it.optDouble("pct") },
+                protein = NutrientBar.from(o.optJSONObject("protein")),
+                fiber = NutrientBar.from(o.optJSONObject("fiber")),
+                proteinBasis = o.optString("protein_basis"),
+                proteinBasisNote = o.optString("protein_basis_note").takeIf { it.isNotBlank() },
+                carb = AmdrPart.from(amdr?.optJSONObject("carb")),
+                fat = AmdrPart.from(amdr?.optJSONObject("fat")),
+                proteinShare = AmdrPart.from(amdr?.optJSONObject("protein")),
+                deficit = d?.let {
+                    Deficit(
+                        value = it.optDouble("value", 0.0),
+                        weeklyKg = it.optDouble("weekly_kg", 0.0),
+                        verdict = it.optString("verdict"),
+                        note = it.optString("note"),
+                        formula = it.optString("formula"),
+                    )
+                },
+                gaps = gaps,
+                hasData = o.optBoolean("has_data", false),
             )
         }
     }

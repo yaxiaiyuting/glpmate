@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -51,7 +52,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -71,34 +71,36 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * 饮食录入浮层（原生版）：一个入口，三种记录方式。
+ * 饮食录入浮层（原生版）：用户只回答"吃了什么"，营养数字全部由教练估。
  *
- * 结构对着 RecordSheet.kt 的 RecordEntryOverlay 写：全屏覆盖层（不是 ModalBottomSheet，
- * 小屏上底部弹层会被键盘顶飞）、顶栏「取消 + 标题」、正文**只有一个 verticalScroll**、
- * 底部固定「主按钮 + 中文错误行」。调用方负责把它放在根 Box 的最后一个子节点。
+ * **这个文件里没有任何营养数字输入框**（热量 / 蛋白质 / 碳水 / 脂肪 / 纤维都没有）。
+ * 用户能做的只有两件事：
  *
- * 三条路各自的网络行为（这是本文件最容易误导人的地方，改动前先看这里）：
+ *   A. 描述 —— 打一句家常话 + 选餐次，点「交给教练估算」。
+ *   B. 拍照 —— 拍一张或从相册选一张，让视觉模型看。
  *
- *   A. 手动填写 —— `vm.addRecord("food", …)` → POST /api/records，一条记录，成功即入库。
- *   B. 文字描述 —— `vm.sendCoachMessage(text)` → POST /api/coach/messages，**只发消息**，
- *      真正入库要等教练在「助手」页回一张 meal_confirm 卡片、用户在那里确认。
- *      所以这里的按钮写「发给教练估算」，不写「保存」，提示语也直说"还没记上"。
- *   C. 拍照 / 相册 —— 本文件内的 HttpURLConnection 把 JPEG 以 multipart/form-data
- *      发到 POST /api/coach/photo（BackendClient 没有 multipart 方法，也不去改它）。
- *      后端**成功时会顺手建一张 meal_confirm 卡片**（server.py coach_photo），
- *      所以这里保存后必须提醒用户去助手页丢弃那张卡片，否则同一餐会记两遍。
+ * 两条路的网络行为（改动前先读这里，这是本文件最容易误导人的地方）：
+ *
+ *   A. `vm.sendCoachMessage("<餐次中文名>：<描述>")` → POST /api/coach/messages。
+ *      **只发消息，不入库**。教练在「助手」页回一张 meal_confirm 待确认卡片，
+ *      用户在那里点确认才会写成一条 food 记录。所以按钮写「交给教练估算」，
+ *      绝不写「保存」；提示语也直说"这一步不会记任何东西"。
+ *   B. 本文件内用 java.net.HttpURLConnection 把 JPEG 以 multipart/form-data
+ *      发到 POST /api/coach/photo（字段名 file，文件名 meal.jpg）。后端成功时
+ *      **自己会建一张 meal_confirm 卡片**（server.py coach_photo），所以这条路
+ *      **同样不写库**——否则用户去助手页确认那张卡时，同一餐会被记两遍。
  *      视觉模型不可用时后端返回 {"error":"vision_unavailable","message":"<中文原因>"}：
- *      原样显示该原因 + 重试 / 改用手动填写，**绝不自己编一个估算出来**。
+ *      原样显示该原因 + 重试 / 改用文字描述，**绝不自己编一个估算出来**。
  *
- * 三条硬约束：
+ * 硬约束：
  *
- * 1) **校验在调后端之前**。buildManualPayload() / buildPhotoPayload() 返回 null 时调用方
- *    什么都不做，非法输入（空描述、非数字、越界）永远到不了后端。
- * 2) **五个营养键永远都发**（kcal / protein_g / carb_g / fat_g / fiber_g），留空发 0.0。
- *    后端 daily_totals() 按这些键聚合，少发一个键不会报错，只会静默少算。
- *    "没填"和"填了 0"在库里长得一样是有意为之（与 RecordSheet 的餐食表单口径一致）；
- *    但也因此**不允许替用户编任何非 0 的默认值**。
- * 3) **纵向只有一个 verticalScroll**（覆盖层正文）。图片列表、餐次 chips 都是普通 Column/Row。
+ * 1) **校验在调后端之前**。描述为空 ⇒ 只在底部显示一行中文错误，一个请求都不发。
+ * 2) **不写库**。本文件里没有 vm.addRecord，也没有 vm.nowIso：两条路都只把信息
+ *    交给教练，落库统一在「助手」页的确认卡片上，只有一条写入路径，从根上不可能重复。
+ * 3) **纵向只有一个 verticalScroll**（浮层正文）。图片、chips 都是普通 Row/Column。
+ * 4) 结构对着 RecordSheet.kt 的 RecordEntryOverlay 写：全屏覆盖层（不是 ModalBottomSheet，
+ *    小屏上底部弹层会被键盘顶飞）、顶栏「取消 + 标题」、正文一个滚动容器、
+ *    底部固定「中文错误行 + 说明 + 主按钮」。调用方负责把它放在根 Box 的最后一个子节点。
  */
 
 // ================================================================ 入口
@@ -106,8 +108,8 @@ import kotlin.math.roundToInt
 /**
  * 打开饮食录入浮层。
  *
- * @param initialMode 打开时默认哪条路："manual"（手动填写）| "text"（交给教练估算）| "photo"（拍照/相册）。
- *                    认不出的值一律退化成 manual。
+ * @param initialMode 打开时默认哪种方式："manual" / "text"（都是"描述"）| "photo"（拍照）。
+ *                    认不出的值一律退化成"描述"（今天页的快捷入口会传 "photo"）。
  */
 @Composable
 fun FoodEntryOverlay(
@@ -119,7 +121,7 @@ fun FoodEntryOverlay(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // 表单状态只建一次：浮层的生命周期就是"选一种方式 → 填完/拍完 → 关掉"。
+    // 表单状态只建一次：浮层的生命周期就是"选一种方式 → 说清楚/拍一张 → 关掉"。
     val st = remember(initialMode) { FoodFormState(initialMode) }
 
     // 图片处理 + 上传 + 解析：拍照、相册、失败重试三条路都汇到这里，
@@ -136,83 +138,107 @@ fun FoodEntryOverlay(
                         is PhotoSource.Reuse -> source.jpeg
                     }
                 }
-                st.lastJpeg = jpeg
+                st.lastJpeg = jpeg      // 重试直接复用，不重新解码/压缩
                 // baseUrl 在连接成功前是 null：这里给中文原因，而不是抛一个 NPE/英文异常
                 val base = vm.backend.baseUrl ?: state.baseUrl
-                    ?: throw IllegalStateException("还没连上内嵌后端，暂时不能识别照片；请等连接成功后重试。")
+                    ?: throw IllegalStateException(
+                        "还没连上内嵌后端，暂时不能识别照片；请等连接成功后重试，或改用文字描述交给教练。"
+                    )
+                Log.i(TAG, "压缩后 ${jpeg.size} 字节，准备上传到 $base/api/coach/photo")
                 val estimate = withContext(Dispatchers.IO) { requestPhotoEstimate(base, jpeg) }
+                Log.i(
+                    TAG,
+                    "识别完成：${estimate.items.size} 项，合计 ${estimate.kcal} kcal，" +
+                        "置信度=${estimate.confidence}",
+                )
                 st.photo = PhotoStage.Done(estimate)
-                st.photoDesc = defaultPhotoDesc(estimate)
             } catch (e: CancellationException) {
                 throw e                    // 协程取消不是失败：既不吞掉，也不当成错误提示
             } catch (e: Exception) {
+                Log.w(TAG, "照片估算失败：${e.javaClass.name}: ${e.message}", e)
                 st.photo = PhotoStage.Failed(
-                    e.message?.takeIf { it.isNotBlank() } ?: "照片估算失败，请重试或改用手动填写。"
+                    e.message?.takeIf { it.isNotBlank() }
+                        ?: "照片估算失败，请重试或改用文字描述交给教练。"
                 )
             }
         }
     }
 
-    // 拍照：用 TakePicturePreview 拿一张小预览图。**不能用 TakePicture** —— 那要 FileProvider
-    // 和清单权限，本文件不允许改别的地方；营养估算用小图完全够。
+    // 拍照：用 TakePicturePreview 拿一张系统相机的预览图。**不能用 TakePicture** —— 那要 FileProvider。
+    // 营养估算用小图完全够，而且不用往磁盘写文件、不用管临时文件的清理。
+    //
+    // 关于"点不开相机"：TakePicturePreview 走的是 android.media.action.IMAGE_CAPTURE，
+    // Android 11+ 的包可见性会过滤掉未声明的 intent——manifest 里必须写
+    // <queries><intent><action android:name="android.media.action.IMAGE_CAPTURE"/> ，
+    // 否则 launch() 直接抛 ActivityNotFoundException，而且没有任何日志、只会"点了没反应"。
     val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
         // bitmap == null 表示用户在相机里按了返回：什么都不做，也不报错（这不是失败）
+        Log.i(TAG, "拍照返回：${if (bitmap == null) "null（用户取消）" else "${bitmap.width}x${bitmap.height}"}")
         if (bitmap != null) runEstimate(PhotoSource.Shot(bitmap))
     }
 
-    // 相册：GetContent("image/*") 返回 Uri，解码/缩放/压缩都在 IO 线程做
+    /** 打开相机，并把"打不开"的原因如实告诉用户，而不是静默无反应。 */
+    val openCamera: () -> Unit = {
+        try {
+            takePicture.launch(null)
+        } catch (e: android.content.ActivityNotFoundException) {
+            Log.w(TAG, "相机的 ActivityNotFoundException：这台设备没有能响应 IMAGE_CAPTURE 的应用", e)
+            st.photo = PhotoStage.Failed(
+                "这台设备上没有能响应拍照请求的相机应用。请改用「从相册选择」，或者改用文字描述交给教练估算。",
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "打不开相机：${e.javaClass.name}", e)
+            st.photo = PhotoStage.Failed(
+                "打不开相机（${e.javaClass.simpleName}）。请改用「从相册选择」，或者改用文字描述交给教练估算。",
+            )
+        }
+    }
+
+    // 相册：GetContent("image/*") 返回 Uri，解码 / 缩放 / 压缩都在 IO 线程做
     val pickFromGallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) runEstimate(PhotoSource.Picked(uri))
-    }
-
-    /** A. 手动填写：校验在 buildManualPayload 里做完，返回 null 就到此为止。 */
-    val saveManual: () -> Unit = {
-        val data = buildManualPayload(st)
-        if (data != null) {
-            vm.addRecord(
-                type = "food",
-                at = vm.nowIso(),
-                value = data.kcal,
-                unit = "kcal",
-                meta = data.meta,
-                successMessage = "餐食已记录",
-            )
-            onDismiss()               // addRecord 是 fire-and-forget：失败原因由它自己弹提示
+        // 这条路径上有三处可能失败（选择器打不开 / 返回 null / Uri 读不了），
+        // 而它们的表现都是"没反应"。加日志让真凶自己暴露，同时把打不开变成中文提示。
+        Log.i(TAG, "相册返回 uri=$uri")
+        if (uri != null) {
+            runEstimate(PhotoSource.Picked(uri))
+        } else {
+            Log.i(TAG, "相册没有返回图片（用户取消，或选择器没有回传数据）")
         }
     }
 
-    /** B. 交给教练估算：只发消息，不入库。回执在「助手」页。 */
+    /** 打开相册，并把"打不开"的原因如实告诉用户。 */
+    val openGallery: () -> Unit = {
+        try {
+            pickFromGallery.launch("image/*")
+        } catch (e: android.content.ActivityNotFoundException) {
+            Log.w(TAG, "相册的 ActivityNotFoundException：这台设备没有能处理 ACTION_GET_CONTENT 的应用", e)
+            st.photo = PhotoStage.Failed(
+                "这台设备上没有能选图片的应用。请改用「拍照」，或者改用文字描述交给教练估算。",
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "打不开相册：${e.javaClass.name}", e)
+            st.photo = PhotoStage.Failed(
+                "打不开相册（${e.javaClass.simpleName}）。请改用「拍照」，或者改用文字描述交给教练估算。",
+            )
+        }
+    }
+
+    /**
+     * A. 交给教练估算：只发消息，不入库。
+     *
+     * 描述为空时**直接返回**，一行中文错误 + 一个请求都不发（buildPrompt 返回 null 就是这个意思）。
+     * 消息文本带上餐次前缀（"午餐：红烧鲫鱼配米饭，还有一份青菜"），教练据此判断该记哪一餐。
+     */
     val sendToCoach: () -> Unit = {
-        st.error = null
-        val text = st.text.trim()
-        when {
-            text.isEmpty() ->
-                st.error = "请先描述这一餐（例如：中午吃了红烧鲫鱼配米饭和一份青菜）"
-            text.length > TEXT_MAX ->
-                st.error = "描述太长了，请控制在 $TEXT_MAX 字以内"
-            else -> {
-                vm.sendCoachMessage(text)
-                onDismiss()
-                // 诚实措辞：这一步没有保存任何记录，卡片在助手页等确认
-                vm.showToast("已交给教练估算，去助手页确认")
-            }
-        }
-    }
-
-    /** C. 拍照：用识别出的合计发一条 food 记录（描述可以改）。 */
-    val savePhoto: (PhotoEstimate) -> Unit = { estimate ->
-        val payload = buildPhotoPayload(st, estimate)
-        if (payload != null) {
-            vm.addRecord(
-                type = "food",
-                at = vm.nowIso(),
-                value = payload.kcal,
-                unit = "kcal",
-                meta = payload.meta,
-                successMessage = "餐食已记录",
-            )
+        val prompt = buildPrompt(st)
+        if (prompt != null) {
+            vm.sendCoachMessage(prompt)
             onDismiss()
+            // 诚实措辞：这一步没有保存任何记录，卡片还在助手页等确认
+            vm.showToast("已交给教练估算，去助手页确认后才会记入")
         }
+        // prompt == null：buildPrompt 已经把中文原因写进 st.error，
+        // 并且没有调用 sendCoachMessage —— 空描述永远不会到后端。
     }
 
     // 物理返回键 = 取消（浮层是全屏的，返回键落到别的页面会很突兀）
@@ -233,7 +259,7 @@ fun FoodEntryOverlay(
         Column(Modifier.fillMaxSize()) {
             FoodTopBar(title = "饮食录入", onCancel = onDismiss)
 
-            // 方式选择器固定在顶部：换方式不用先滚回去；上传中不许切走
+            // 方式选择器固定在顶部：换方式不用先滚回去；上传中不许切走（免得用户以为已经取消）
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -258,71 +284,68 @@ fun FoodEntryOverlay(
             ) {
                 Spacer(Modifier.height(6.dp))
                 when (st.mode) {
-                    MODE_TEXT -> TextModeBody(st, state.bootstrap?.quota)
                     MODE_PHOTO -> PhotoModeBody(
                         st = st,
-                        onTakePhoto = { takePicture.launch(null) },
-                        onPickGallery = { pickFromGallery.launch("image/*") },
+                        onTakePhoto = openCamera,        // 走带 try/catch 的版本，打不开也要有中文提示
+                        onPickGallery = openGallery,
                         onRetry = {
                             val bytes = st.lastJpeg
                             if (bytes == null) {
-                                st.photo = PhotoStage.Failed("没有可以重试的图片，请重新拍照或从相册选择。")
+                                st.photo = PhotoStage.Failed(
+                                    "没有可以重试的图片，请重新拍照或从相册选择。"
+                                )
                             } else {
                                 runEstimate(PhotoSource.Reuse(bytes))
                             }
                         },
-                        onManual = {
-                            st.mode = MODE_MANUAL
+                        onDescribe = {
+                            st.mode = MODE_DESCRIBE
                             st.error = null
                         },
                     )
-                    else -> ManualModeBody(st)
+                    else -> DescribeModeBody(st = st, quota = state.bootstrap?.quota)
                 }
                 Spacer(Modifier.height(20.dp))
             }
 
-            // 底部主按钮：文案/可用性/行为随方式和阶段变化，但永远只有一个主按钮
-            val busy = state.busy || st.photo is PhotoStage.Uploading || state.coachSending
-            var actionLabel: String? = null
-            var actionHint: String? = null
+            // 底部主按钮：文案/可用性/行为随方式与阶段变化，但永远只有一个主按钮。
+            // 拍照那条路在"还没选图"和"估算失败"时没有可执行的主操作，就给 null，
+            // 只留一句说明，不摆一个点了没反应的灰按钮。
+            val busy = state.busy || state.coachSending || st.photo is PhotoStage.Uploading
+            var label: String? = null
+            var hint: String? = null
             var action: () -> Unit = {}
             when (st.mode) {
-                MODE_TEXT -> {
-                    actionLabel = "发给教练估算"
-                    action = sendToCoach
-                }
                 MODE_PHOTO -> when (val stage = st.photo) {
                     is PhotoStage.Uploading -> {
-                        actionLabel = "正在估算…"
-                        actionHint = "照片正在发给本机后端的图像模型，快的话几秒，慢的话十几秒。"
+                        label = "正在估算…"
+                        hint = "照片正在发给本机后端的图像模型，快的话几秒，慢的话十几秒。"
                     }
                     is PhotoStage.Done -> {
                         // 照片路径**刻意不在这里写记录**：后端 /api/coach/photo 成功时
-                        // 已经顺手建了一张 meal_confirm 待确认卡片。如果这里再 save 一条，
+                        // 已经建了一张 meal_confirm 待确认卡片。如果这里再写一条，
                         // 用户去助手页确认那张卡时同一餐就被记两遍。
-                        // 所以这里只负责"生成估算"，落库统一走助手页的确认卡片——
-                        // 只有一条写入路径，从根上不可能重复。
-                        actionLabel = "去助手页确认"
-                        actionHint = "估算已生成。为避免重复记账，这一步不写库；" +
-                            "请到助手页点确认，那条餐食才会记入。"
+                        // 所以这里只负责"把估算显示出来"，落库统一走助手页的确认卡片。
+                        label = "去助手页确认"
+                        hint = "估算已生成。为避免同一餐记两遍，这一步不写库；" +
+                            "请到助手页点确认，那一餐才会记入。"
                         action = {
                             vm.showToast("估算已生成，去助手页确认后才会记入")
                             onDismiss()
                         }
                     }
-                    is PhotoStage.Failed -> actionHint = "可以点上面的「重试」，或者改用手动填写。"
-                    else -> actionHint = "先拍一张，或者从相册里选一张。"
+                    is PhotoStage.Failed -> hint = "可以点上面的「重试」，或者改用文字描述交给教练估算。"
+                    else -> hint = "先拍一张，或者从相册里选一张；也可以在顶部切到「描述」。"
                 }
                 else -> {
-                    actionLabel = if (state.busy) "保存中…" else "保存"
-                    action = saveManual
+                    label = "交给教练估算"
+                    action = sendToCoach
                 }
             }
-
             FoodBottomBar(
                 error = st.error,
-                hint = actionHint,
-                label = actionLabel,
+                hint = hint,
+                label = label,
                 enabled = !busy,
                 onClick = action,
             )
@@ -337,6 +360,8 @@ private fun FoodTopBar(title: String, onCancel: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
+            // 不透明背景是必需的：这行是固定的，下面的表单滚上来会透过去。
+            .background(GlpColors.Bg)
             .windowInsetsPadding(WindowInsets.statusBars)
             .padding(horizontal = 6.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -368,8 +393,7 @@ private fun FoodTopBar(title: String, onCancel: () -> Unit) {
  *
  * 错误贴着按钮放，而不是塞进表单里：表单是滚动的，错误如果在最上面，
  * 用户点按钮时可能看不到（与 RecordSheet 的 OverlayBottomBar 同一个理由）。
- * 主按钮允许为 null：拍照那条路在"还没选图"和"估算失败"时没有可执行的主操作，
- * 这时只给一句说明，不摆一个点了没反应的灰按钮。
+ * 主按钮允许为 null：拍照那条路在没有可执行的主操作时只给一句说明。
  */
 @Composable
 private fun FoodBottomBar(
@@ -410,18 +434,31 @@ private fun FoodBottomBar(
     }
 }
 
-// ================================================================ 三条路的正文
+// ================================================================ 两条路的正文
 
-/** A. 手动填写：餐次 + 描述 + 五个选填数字（全部留空也允许，留空按 0 发）。 */
+/** A. 描述：一句话 + 餐次。没有数字输入框——数字是教练的事。 */
 @Composable
-private fun ManualModeBody(st: FoodFormState) {
+private fun DescribeModeBody(st: FoodFormState, quota: Quota?) {
     GlpCard {
-        FoodField(
-            label = "吃了什么",
+        Text(
+            "这一餐吃了什么",
+            color = GlpColors.Text,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "说句家常话就行：菜名、大概份量、做法提一下。热量和蛋白质这些数字全部由教练估，你不用填。",
+            color = GlpColors.Text3,
+            fontSize = 11.sp,
+            lineHeight = 15.sp,
+        )
+        Spacer(Modifier.height(12.dp))
+        DescField(
+            label = "描述",
             value = st.desc,
             onValueChange = { st.desc = it; st.error = null },
-            placeholder = "例如：红烧鲫鱼配米饭",
-            multiline = true,
+            placeholder = "例如：中午吃了红烧鲫鱼配米饭，还有一份青菜",
         )
         Spacer(Modifier.height(12.dp))
         Text("餐次", color = GlpColors.Text2, fontSize = 11.5.sp)
@@ -431,72 +468,11 @@ private fun ManualModeBody(st: FoodFormState) {
                 ChoiceChip(cn, st.slot == key) { st.slot = key; st.error = null }
             }
         }
-        Spacer(Modifier.height(14.dp))
-        Text("营养估算（都可以留空，留空按 0 记）", color = GlpColors.Text2, fontSize = 11.5.sp)
-        Spacer(Modifier.height(8.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            FoodField(
-                "热量", st.kcal, { st.kcal = it; st.error = null },
-                Modifier.weight(1f), placeholder = "500", unit = "kcal",
-                keyboardType = KeyboardType.Decimal,
-            )
-            FoodField(
-                "蛋白质", st.protein, { st.protein = it; st.error = null },
-                Modifier.weight(1f), placeholder = "30", unit = "g",
-                keyboardType = KeyboardType.Decimal,
-            )
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            FoodField(
-                "碳水", st.carb, { st.carb = it; st.error = null },
-                Modifier.weight(1f), placeholder = "60", unit = "g",
-                keyboardType = KeyboardType.Decimal,
-            )
-            FoodField(
-                "脂肪", st.fat, { st.fat = it; st.error = null },
-                Modifier.weight(1f), placeholder = "20", unit = "g",
-                keyboardType = KeyboardType.Decimal,
-            )
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            FoodField(
-                "纤维", st.fiber, { st.fiber = it; st.error = null },
-                Modifier.weight(1f), placeholder = "8", unit = "g",
-                keyboardType = KeyboardType.Decimal,
-            )
-            Spacer(Modifier.weight(1f))
-        }
-        Spacer(Modifier.height(8.dp))
-        HintLine("五个数字会一起发给后端（留空发 0），只填热量也可以；数字直接进今天页的营养进度。", "🍽")
-    }
-}
-
-/** B. 文字描述，让教练估算：只发消息，不入库。 */
-@Composable
-private fun TextModeBody(st: FoodFormState, quota: Quota?) {
-    GlpCard {
-        Text("用一句话说清吃了什么", color = GlpColors.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "教练会把这句家常话拆成一顿饭的营养估算。",
-            color = GlpColors.Text3,
-            fontSize = 11.sp,
-            lineHeight = 15.sp,
-        )
-        Spacer(Modifier.height(12.dp))
-        FoodField(
-            label = "这一餐",
-            value = st.text,
-            onValueChange = { st.text = it; st.error = null },
-            placeholder = "例如：中午吃了红烧鲫鱼配米饭和一份青菜",
-            multiline = true,
-        )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
+        // 常驻的诚实说明：这一步本身什么都不记
         HintLine(
-            "这一步只发消息，不会直接记一条餐食：教练在「助手」页回你一张待确认卡片，" +
-                "你在那里点确认之后才会写进今天。",
+            "这一步只会把描述发给教练，本身不记任何东西：教练在「助手」页回你一张待确认卡片，" +
+                "你在那里点确认之后，这一餐才会写进今天。",
             "💬",
         )
         if (quota != null) {
@@ -505,14 +481,14 @@ private fun TextModeBody(st: FoodFormState, quota: Quota?) {
     }
 }
 
-/** C. 拍照 / 相册：未选图 → 上传中 → 识别结果 → 失败重试，四个阶段。 */
+/** B. 拍照 / 相册：未选图 → 上传中 → 识别结果 → 失败重试，四个阶段。 */
 @Composable
 private fun PhotoModeBody(
     st: FoodFormState,
     onTakePhoto: () -> Unit,
     onPickGallery: () -> Unit,
     onRetry: () -> Unit,
-    onManual: () -> Unit,
+    onDescribe: () -> Unit,
 ) {
     when (val stage = st.photo) {
         is PhotoStage.Uploading -> GlpCard {
@@ -523,25 +499,38 @@ private fun PhotoModeBody(
                     strokeWidth = 2.dp,
                 )
                 Spacer(Modifier.width(10.dp))
-                Text("正在识别这张照片…", color = GlpColors.Text, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text(
+                    "正在识别这张照片…",
+                    color = GlpColors.Text,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                )
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                "图片已经压到最长边 $MAX_EDGE 像素再上传，估算结果出来后还要你确认才会保存。",
+                "图片已经缩到最长边 $MAX_EDGE 像素再上传。识别结果会以一张待确认卡片出现在「助手」页。",
                 color = GlpColors.Text3,
                 fontSize = 11.sp,
                 lineHeight = 15.sp,
             )
         }
 
-        is PhotoStage.Done -> PhotoResultCard(st, stage.estimate)
+        is PhotoStage.Done -> PhotoResultCard(
+            estimate = stage.estimate,
+            onReset = {
+                // 只丢弃界面上这次结果；后端为它建的那张卡片仍在「助手」页，用户去那里丢弃
+                st.photo = PhotoStage.Idle
+                st.lastJpeg = null
+                st.error = null
+            },
+        )
 
         is PhotoStage.Failed -> GlpCard {
             // 后端的 {"error":"vision_unavailable","message":"…"} 里的中文原因原样显示，不加工
             ErrorState(message = stage.message, onRetry = onRetry)
             Spacer(Modifier.height(4.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                PillButton("改用手动填写", GlpColors.Text2) { onManual() }
+                PillButton("改用文字描述", GlpColors.Text2) { onDescribe() }
             }
         }
 
@@ -550,7 +539,8 @@ private fun PhotoModeBody(
             Spacer(Modifier.height(4.dp))
             Text(
                 "拍照用的是系统相机的预览图（分辨率不高，但估算营养够用）；" +
-                    "从相册选的图会先缩到最长边 $MAX_EDGE 像素、压成 JPEG 再上传。",
+                    "从相册选的图会先缩到最长边 $MAX_EDGE 像素、压成 JPEG 再上传。" +
+                    "数字同样由教练估，你只需要确认拍的是这一餐。",
                 color = GlpColors.Text3,
                 fontSize = 11.sp,
                 lineHeight = 15.sp,
@@ -566,21 +556,27 @@ private fun PhotoModeBody(
                 "🔒",
             )
             HintLine(
-                "识别完不会自动入库：要你在这里点「保存」，或者到「助手」页确认那张待确认卡片。",
+                "识别完不会自动入库：后端会为这张照片在「助手」页放一张待确认卡片，" +
+                    "你去那里点确认才会记入。",
                 "🍽",
             )
         }
     }
 }
 
-/** 识别结果：逐项列出 + 合计行 + 置信度 + 后端给的原话 + 可改的描述 + 餐次。 */
+/**
+ * 识别结果：逐项列出 + 合计 + 置信度 + 后端给的原话。
+ *
+ * **这里没有可编辑的数字，也没有"保存"按钮**：数字是模型给的（原样显示，不四舍五入成好看的数），
+ * 落库要等用户在「助手」页确认那张卡片。范围异常的估算只在界面上如实提醒，不改数、不编数。
+ */
 @Composable
-private fun PhotoResultCard(st: FoodFormState, estimate: PhotoEstimate) {
+private fun PhotoResultCard(estimate: PhotoEstimate, onReset: () -> Unit) {
     GlpCard {
         Text("识别结果", color = GlpColors.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(4.dp))
         Text(
-            "置信度：${confidenceCn(estimate.confidence)} · 模型估算值，请核对后再保存",
+            "置信度：${confidenceCn(estimate.confidence)} · 模型估算值，请到助手页核对后再确认",
             color = GlpColors.Text3,
             fontSize = 11.sp,
         )
@@ -619,98 +615,66 @@ private fun PhotoResultCard(st: FoodFormState, estimate: PhotoEstimate) {
             TotalStat("纤维", estimate.fiberG, "g")
         }
 
-        Spacer(Modifier.height(14.dp))
-        FoodField(
-            label = "这一餐的描述（可以改）",
-            value = st.photoDesc,
-            onValueChange = { st.photoDesc = it; st.error = null },
-            placeholder = "例如：红烧鲫鱼配米饭",
-        )
-        Spacer(Modifier.height(12.dp))
-        Text("餐次", color = GlpColors.Text2, fontSize = 11.5.sp)
-        Spacer(Modifier.height(8.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FOOD_SLOTS.forEach { (key, cn) ->
-                ChoiceChip(cn, st.slot == key) { st.slot = key; st.error = null }
-            }
+        val warning = sanityWarning(estimate)
+        if (warning != null) {
+            HintLine(warning, "⚠️")
         }
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(6.dp))
         HintLine(
-            "后端已经为这张照片在「助手」页建了一张待确认卡片。如果在这里保存，" +
-                "请到助手页把那张卡片丢弃，免得同一餐记两遍。",
+            "这张照片已经在「助手」页生成了一张待确认卡片。为避免同一餐记两遍，" +
+                "这里不写库：请到助手页点确认，那一餐才会记入；不需要就在那里丢弃。",
             "⚠️",
         )
         Spacer(Modifier.height(4.dp))
-        PillButton("重新拍照 / 换一张", GlpColors.Text2) {
-            // 丢弃这次估算（后端那张卡片仍在助手页，用户去那边丢弃）
-            st.photo = PhotoStage.Idle
-            st.lastJpeg = null
-            st.photoDesc = ""
-            st.error = null
-        }
+        PillButton("重新拍照 / 换一张", GlpColors.Text2) { onReset() }
     }
 }
 
 // ================================================================ 输入控件
 
 /**
- * 本地输入框（BasicTextField + 设计系统令牌，视觉与 RecordSheet 的 EntryField 一致）。
+ * 描述输入框（本地版）。
  *
  * 为什么不复用 RecordSheet 的 EntryField：它是 private，本文件不能改那个文件。
- * 这里只保留本浮层要用的能力（单行/多行 + 单位后缀），不放 hint —— 说明统一走 HintLine，
- * 免得两个浮层各自长出一套提示样式。
+ * 这里只要多行文本一种形态——本浮层**没有任何数字输入框**，营养数字一律由教练估，
+ * 说明文字统一走 HintLine，免得这里再长出一套提示样式。
  */
 @Composable
-private fun FoodField(
+private fun DescField(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    placeholder: String = "",
-    unit: String? = null,
-    multiline: Boolean = false,
-    keyboardType: KeyboardType = KeyboardType.Text,
+    placeholder: String,
 ) {
     var focused by remember { mutableStateOf(false) }
     val borderColor = if (focused) GlpColors.Accent.copy(alpha = 0.7f) else GlpColors.Line
 
-    Column(modifier) {
+    Column {
         Text(label, color = GlpColors.Text2, fontSize = 11.5.sp)
         Spacer(Modifier.height(5.dp))
-        Row(
+        Box(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
                 .background(GlpColors.SurfaceAlt)
                 .border(1.dp, borderColor, RoundedCornerShape(12.dp))
                 .padding(horizontal = 12.dp, vertical = 11.dp)
-                .then(if (multiline) Modifier.heightIn(min = 52.dp) else Modifier),
-            verticalAlignment = if (multiline) Alignment.Top else Alignment.CenterVertically,
+                .heightIn(min = 84.dp),
         ) {
-            Box(Modifier.weight(1f)) {
-                if (value.isEmpty() && placeholder.isNotEmpty()) {
-                    Text(placeholder, color = GlpColors.Text3, fontSize = 14.sp)
-                }
-                BasicTextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    singleLine = !multiline,
-                    textStyle = TextStyle(color = GlpColors.Text, fontSize = 14.sp),
-                    cursorBrush = SolidColor(GlpColors.Accent),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = keyboardType,
-                        imeAction = if (multiline) ImeAction.Default else ImeAction.Done,
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onFocusChanged { focused = it.isFocused },
-                )
+            if (value.isEmpty()) {
+                Text(placeholder, color = GlpColors.Text3, fontSize = 14.sp, lineHeight = 20.sp)
             }
-            if (!unit.isNullOrBlank()) {
-                Spacer(Modifier.width(6.dp))
-                Text(unit, color = GlpColors.Text3, fontSize = 12.sp)
-            }
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                textStyle = TextStyle(color = GlpColors.Text, fontSize = 14.sp, lineHeight = 20.sp),
+                cursorBrush = SolidColor(GlpColors.Accent),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { focused = it.isFocused },
+            )
         }
     }
 }
@@ -737,31 +701,23 @@ private fun RowScope.TotalStat(label: String, value: Double, unit: String) {
 // ================================================================ 表单状态
 
 /**
- * 表单状态。
+ * 表单状态：两条路各自的输入，共用一个中文错误出口（st.error → 底部红字）。
  *
- * 与 RecordSheet 的 EntryState 同样是"一个 class + mutableStateOf"，但只装饮食录入要用的字段：
- * 三条路的状态互不干扰，但共用一个中文错误出口（st.error → 底部红字）。
+ * 只有两个用户输入：描述文本 + 餐次。**没有任何营养数字字段**——这是本文件的核心约定，
+ * 以后要加字段前先想清楚：数字该由教练估，不该由用户填。
  */
 private class FoodFormState(initialMode: String) {
-    /** 当前方式："manual" | "text" | "photo"。 */
+    /** 当前方式："describe" | "photo"。 */
     var mode by mutableStateOf(normalizeMode(initialMode))
 
-    // ---- A. 手动填写
-    /** 餐次：默认按当前钟点猜（与后端 _slot_now() 的窗口完全一致）。 */
+    /** 餐次：默认按当前钟点猜（与后端 _slot_now() 的窗口一致）。 */
     var slot by mutableStateOf(slotByHour())
+
+    /** 用户对"吃了什么"的描述。发给教练时会加上餐次前缀。 */
     var desc by mutableStateOf("")
-    var kcal by mutableStateOf("")
-    var protein by mutableStateOf("")
-    var carb by mutableStateOf("")
-    var fat by mutableStateOf("")
-    var fiber by mutableStateOf("")
 
-    // ---- B. 交给教练估算
-    var text by mutableStateOf("")
-
-    // ---- C. 拍照 / 相册
+    /** 拍照那条路的阶段。 */
     var photo by mutableStateOf<PhotoStage>(PhotoStage.Idle)
-    var photoDesc by mutableStateOf("")
 
     /**
      * 最近一次压缩好的 JPEG：重试时直接复用，不重新解码/压缩。
@@ -769,7 +725,7 @@ private class FoodFormState(initialMode: String) {
      */
     var lastJpeg: ByteArray? = null
 
-    /** 校验/保存失败的中文原因；非空时底部显示，并且对应的动作不会调后端。 */
+    /** 校验失败的中文原因；非空时底部显示，并且不会调后端。 */
     var error by mutableStateOf<String?>(null)
 }
 
@@ -781,7 +737,7 @@ private sealed class PhotoStage {
     /** 压缩/上传/等模型，界面上是一个转圈 */
     object Uploading : PhotoStage()
 
-    /** 拿到估算，等用户核对后保存或丢弃 */
+    /** 拿到估算，只展示；落库在「助手」页的确认卡片 */
     class Done(val estimate: PhotoEstimate) : PhotoStage()
 
     /** 失败：message 一定是中文（后端原因原样透传，其余由本文件翻译） */
@@ -817,18 +773,21 @@ private class PhotoEstimate(
 
 // ================================================================ 常量
 
-private const val MODE_MANUAL = "manual"
-private const val MODE_TEXT = "text"
+private const val TAG = "GlpFood"
+
+private const val MODE_DESCRIBE = "describe"
 private const val MODE_PHOTO = "photo"
 
-/** 方式选择器：(mode key, 中文标签)；key 与 initialMode 的取值一致。 */
+/** 方式选择器：(mode key, 中文标签)。用户在这里选的是"怎么描述这一餐"，不是"填哪些字段"。 */
 private val MODES: List<Pair<String, String>> = listOf(
-    MODE_MANUAL to "手动填写",
-    MODE_TEXT to "让教练估算",
-    MODE_PHOTO to "拍照识别",
+    MODE_DESCRIBE to "描述",
+    MODE_PHOTO to "拍照",
 )
 
-/** 餐次 key 必须与后端一致（breakfast/lunch/dinner/snack），中文只用于显示。 */
+/**
+ * 餐次 key 必须与后端一致（breakfast/lunch/dinner/snack），中文只用于显示，
+ * 也是发给教练的消息前缀（"午餐：…"）。
+ */
 private val FOOD_SLOTS: List<Pair<String, String>> = listOf(
     "breakfast" to "早餐",
     "lunch" to "午餐",
@@ -836,17 +795,16 @@ private val FOOD_SLOTS: List<Pair<String, String>> = listOf(
     "snack" to "加餐",
 )
 
-// 五个营养字段的上限：与 RecordSheet 的餐食表单同一口径，超出按手误拦下。
-// 识别结果（模型给的数）也按这套上限做一次合理性检查——模型偶尔会给出荒唐的大数，
-// 那会直接污染今天页的日均统计，宁可拦下来让用户改用手动填写。
+// 估算值的合理性上限：模型偶尔会给出荒唐的大数（例如 9000 kcal 的一餐）。
+// 这里**只用来提醒**，不拦、不改、不替用户编数字：真正的落库决策在助手页的确认卡片上。
 private const val KCAL_MAX = 5000.0
 private const val PROTEIN_MAX = 500.0
 private const val CARB_MAX = 800.0
 private const val FAT_MAX = 500.0
 private const val FIBER_MAX = 200.0
 
+/** 描述长度上限：够写清一顿饭，又不至于把教练的额度浪费在一篇小作文上。 */
 private const val DESC_MAX = 200
-private const val TEXT_MAX = 500
 
 /** 图片压缩口径与后端 coach.VISION_EDGE / quality=85 一致（最长边 1024、JPEG 85）。 */
 private const val MAX_EDGE = 1024
@@ -857,129 +815,33 @@ private const val JPEG_QUALITY = 85
 private const val CONNECT_TIMEOUT_MS = 15_000
 private const val VISION_TIMEOUT_MS = 150_000
 
-// ================================================================ 校验 + payload
-
-/** 校验通过后的手动记录：value 是热量，meta 是七件套。 */
-private class FoodPayload(val kcal: Double, val meta: Map<String, Any?>)
+// ================================================================ 校验 + 消息文本
 
 /**
- * A. 手动填写的校验 + 组装。
+ * A. 把"餐次 + 描述"拼成发给教练的一句话，顺便做完校验。
  *
- * 任何一项不合法都会把中文字段级原因写进 st.error 并返回 null —— 调用方只在拿到
- * 非 null 时才调 vm.addRecord，所以非法输入永远到不了 POST /api/records。
- * 五个营养键**永远都发**：留空发 0.0（不编造非 0 的默认值）。
+ * 返回 null 表示输入不合法：调用方什么都不做，所以空描述永远到不了 /api/coach/messages。
+ * 这里只拼文本，**不生成任何营养数字**——那是教练的活。
  */
-private fun buildManualPayload(st: FoodFormState): FoodPayload? {
+private fun buildPrompt(st: FoodFormState): String? {
     st.error = null
     val desc = st.desc.trim()
     if (desc.isEmpty()) {
-        st.error = "请填写吃了什么"
+        st.error = "请先说说这一餐吃了什么（例如：中午吃了红烧鲫鱼配米饭，还有一份青菜）"
         return null
     }
     if (desc.length > DESC_MAX) {
         st.error = "描述太长了，请控制在 $DESC_MAX 字以内"
         return null
     }
-    val kcal = optNum(st.kcal, "热量", KCAL_MAX) { st.error = it } ?: return null
-    val protein = optNum(st.protein, "蛋白质", PROTEIN_MAX) { st.error = it } ?: return null
-    val carb = optNum(st.carb, "碳水", CARB_MAX) { st.error = it } ?: return null
-    val fat = optNum(st.fat, "脂肪", FAT_MAX) { st.error = it } ?: return null
-    val fiber = optNum(st.fiber, "纤维", FIBER_MAX) { st.error = it } ?: return null
-    return FoodPayload(
-        kcal = kcal,
-        meta = foodMeta(st.slot, desc, kcal, protein, carb, fat, fiber),
-    )
+    // 前缀是中文餐次名：教练据此知道该记哪一餐，比再让用户选一次日期时间省事
+    return "${slotLabelCn(st.slot)}：$desc"
 }
 
-/**
- * C. 拍照的校验 + 组装：把识别出的**合计**发成一条 food 记录，键与手动填写完全一致。
- *
- * 这里再查一遍范围不是多余：模型给的大数会直接进日均统计，宁可拦下来让人改用手动填写。
- * 注意 meta 里不放 items —— 逐项明细只在界面上展示，入库口径与手动填写保持一致。
- */
-private fun buildPhotoPayload(st: FoodFormState, estimate: PhotoEstimate): FoodPayload? {
-    st.error = null
-    val desc = st.photoDesc.trim()
-    if (desc.isEmpty()) {
-        st.error = "请填写这一餐的描述"
-        return null
-    }
-    if (desc.length > DESC_MAX) {
-        st.error = "描述太长了，请控制在 $DESC_MAX 字以内"
-        return null
-    }
-    val checks = listOf(
-        Triple("热量", estimate.kcal, KCAL_MAX),
-        Triple("蛋白质", estimate.proteinG, PROTEIN_MAX),
-        Triple("碳水", estimate.carbG, CARB_MAX),
-        Triple("脂肪", estimate.fatG, FAT_MAX),
-        Triple("纤维", estimate.fiberG, FIBER_MAX),
-    )
-    for ((label, value, max) in checks) {
-        if (value.isNaN() || value.isInfinite() || value < 0.0) {
-            st.error = "$label 的估算值不正常（${formatNum(value)}），请改用手动填写核对"
-            return null
-        }
-        if (value > max) {
-            st.error = "$label 的估算值 ${formatNum(value)} 超出合理范围（上限 ${formatNum(max)}），请改用手动填写核对"
-            return null
-        }
-    }
-    return FoodPayload(
-        kcal = estimate.kcal,
-        meta = foodMeta(
-            st.slot, desc, estimate.kcal,
-            estimate.proteinG, estimate.carbG, estimate.fatG, estimate.fiberG,
-        ),
-    )
-}
-
-/**
- * 一条 food 记录的 meta。
- *
- * 键名与后端 models.normalize_payload() / daily_totals() 的口径一致：
- * slot 决定今天页按哪一餐显示，后五个键是营养聚合的唯一来源。少一个键不会报错，
- * 只会静默少算——所以这里固定七个键，一个都不省。
- */
-private fun foodMeta(
-    slot: String,
-    desc: String,
-    kcal: Double,
-    protein: Double,
-    carb: Double,
-    fat: Double,
-    fiber: Double,
-): Map<String, Any?> = mapOf(
-    "slot" to slot,
-    "desc" to desc,
-    "kcal" to kcal,
-    "protein_g" to protein,
-    "carb_g" to carb,
-    "fat_g" to fat,
-    "fiber_g" to fiber,
-)
-
-/** 选填数字：留空记 0（五个键必须都发），填了就必须是非负数字且在范围内。 */
-private fun optNum(raw: String, label: String, max: Double, fail: (String) -> Unit): Double? {
-    val text = raw.trim()
-    if (text.isEmpty()) return 0.0
-    val n = text.toDoubleOrNull()
-    if (n == null || n.isNaN() || n.isInfinite()) {
-        fail("$label 请输入数字，留空按 0 记")
-        return null
-    }
-    if (n < 0.0 || n > max) {
-        fail("$label 需在 0–${formatNum(max)} 之间")
-        return null
-    }
-    return n
-}
-
-/** 只认三个已知的方式；认不出的（包括以后改过名字的）一律退化成手动填写。 */
+/** 只认两种方式；"manual" / "text"（旧入口传的值）和一切认不出的值都退化成"描述"。 */
 private fun normalizeMode(raw: String): String = when (raw.trim().lowercase()) {
-    MODE_TEXT -> MODE_TEXT
     MODE_PHOTO -> MODE_PHOTO
-    else -> MODE_MANUAL
+    else -> MODE_DESCRIBE
 }
 
 /**
@@ -996,6 +858,10 @@ private fun slotByHour(): String {
     }
 }
 
+/** 餐次 key → 中文名；只用于显示和消息前缀，认不出就写"这一餐"（不猜）。 */
+private fun slotLabelCn(key: String): String =
+    FOOD_SLOTS.firstOrNull { it.first == key }?.second ?: "这一餐"
+
 /** low/medium/high → 低/中/高；后端给了别的值就老实写"未知"，不猜。 */
 private fun confidenceCn(raw: String): String = when (raw.trim().lowercase()) {
     "low" -> "低"
@@ -1004,9 +870,31 @@ private fun confidenceCn(raw: String): String = when (raw.trim().lowercase()) {
     else -> "未知"
 }
 
-/** 描述默认值：把菜名串起来（与后端建卡片时的写法一致），一个菜名都没有才写"一餐"。 */
-private fun defaultPhotoDesc(estimate: PhotoEstimate): String =
-    estimate.items.joinToString("、") { it.name }.ifBlank { "一餐" }
+/**
+ * 估算值的合理性提醒。返回 null 表示看着正常。
+ *
+ * 只提醒，不改数：数字是模型给的，用户要看到的是原值；确认/丢弃的权力在助手页那张卡片上。
+ */
+private fun sanityWarning(estimate: PhotoEstimate): String? {
+    val checks = listOf(
+        Triple("热量", estimate.kcal, KCAL_MAX),
+        Triple("蛋白质", estimate.proteinG, PROTEIN_MAX),
+        Triple("碳水", estimate.carbG, CARB_MAX),
+        Triple("脂肪", estimate.fatG, FAT_MAX),
+        Triple("纤维", estimate.fiberG, FIBER_MAX),
+    )
+    for ((label, value, max) in checks) {
+        if (value.isNaN() || value.isInfinite() || value < 0.0) {
+            return "$label 的估算值不正常（${formatNum(value)}），请重试或换一张照片；" +
+                "去助手页确认前也请再核对一遍。"
+        }
+        if (value > max) {
+            return "$label 的估算值 ${formatNum(value)} 偏大（超过 ${formatNum(max)}），" +
+                "确认前请先核对，必要时在助手页丢弃那张卡片。"
+        }
+    }
+    return null
+}
 
 // ================================================================ 图片处理
 
@@ -1025,21 +913,21 @@ private fun uriToJpeg(context: Context, uri: Uri): ByteArray {
     try {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-            ?: throw IllegalStateException("打不开这张图片，请换一张或改用手动填写。")
+            ?: throw IllegalStateException("打不开这张图片，请换一张或改用文字描述交给教练。")
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
-            throw IllegalStateException("这张图片没法解码（可能是不支持的格式），请换一张或改用手动填写。")
+            throw IllegalStateException("这张图片没法解码（可能是不支持的格式），请换一张或改用文字描述交给教练。")
         }
         val options = BitmapFactory.Options().apply {
             inSampleSize = sampleSizeFor(bounds.outWidth, bounds.outHeight, MAX_EDGE)
         }
         val decoded = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
-            ?: throw IllegalStateException("打不开这张图片，请换一张或改用手动填写。")
+            ?: throw IllegalStateException("打不开这张图片，请换一张或改用文字描述交给教练。")
         return compressJpeg(shrinkToMaxEdge(decoded, MAX_EDGE))
     } catch (e: SecurityException) {
         // 相册 Uri 的读权限只在当次选择有效：进程被杀后重开会走到这里
-        throw IllegalStateException("系统没给这张图片的读取权限，请重新选择或改用手动填写。")
+        throw IllegalStateException("系统没给这张图片的读取权限，请重新选择或改用文字描述交给教练。")
     } catch (e: IllegalArgumentException) {
-        throw IllegalStateException("这个图片来源读不了，请重新选择或改用手动填写。")
+        throw IllegalStateException("这个图片来源读不了，请重新选择或改用文字描述交给教练。")
     }
 }
 
@@ -1072,11 +960,11 @@ private fun compressJpeg(bitmap: Bitmap, quality: Int = JPEG_QUALITY): ByteArray
     val ok = try {
         bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
     } catch (e: Exception) {
-        throw IllegalStateException("图片压缩失败：${e.message ?: "JPEG 编码出错"}，请重新拍照或改用手动填写。")
+        throw IllegalStateException("图片压缩失败：${e.message ?: "JPEG 编码出错"}，请重新拍照或改用文字描述交给教练。")
     }
-    if (!ok) throw IllegalStateException("图片压缩失败，请重新拍照或改用手动填写。")
+    if (!ok) throw IllegalStateException("图片压缩失败，请重新拍照或改用文字描述交给教练。")
     val bytes = out.toByteArray()
-    if (bytes.isEmpty()) throw IllegalStateException("图片压缩后是空的，请重新拍照或改用手动填写。")
+    if (bytes.isEmpty()) throw IllegalStateException("图片压缩后是空的，请重新拍照或改用文字描述交给教练。")
     return bytes
 }
 
@@ -1089,12 +977,13 @@ private fun compressJpeg(bitmap: Bitmap, quality: Int = JPEG_QUALITY): ByteArray
  * 只用 java.net.HttpURLConnection + 手拼 boundary，不引 OkHttp。
  *
  * 失败一律抛 IllegalStateException，message 一定是中文：要么是后端给的原因（逐字），
- * 要么是本文件按状态码翻译的说明。绝不在失败时返回一个编出来的估算。
+ * 要么是本文件按状态码翻译的说明。**绝不在失败时返回一个编出来的估算**。
  */
 private fun requestPhotoEstimate(baseUrl: String, jpeg: ByteArray): PhotoEstimate {
     val boundary = "----glpmate" + UUID.randomUUID().toString().replace("-", "")
     val body = multipartBody(boundary, "file", "meal.jpg", "image/jpeg", jpeg)
-    val conn = URL(baseUrl + "/api/coach/photo").openConnection() as HttpURLConnection
+    val target = baseUrl + "/api/coach/photo"
+    val conn = URL(target).openConnection() as HttpURLConnection
     try {
         conn.requestMethod = "POST"
         conn.doOutput = true
@@ -1102,27 +991,29 @@ private fun requestPhotoEstimate(baseUrl: String, jpeg: ByteArray): PhotoEstimat
         conn.readTimeout = VISION_TIMEOUT_MS
         conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
         conn.setFixedLengthStreamingMode(body.size)
+        Log.i(TAG, "POST $target（multipart 字段 file=meal.jpg，body ${body.size} 字节）")
         conn.outputStream.use { it.write(body) }
 
         val code = conn.responseCode
         val text = readResponse(conn)
+        Log.i(TAG, "上传响应 HTTP $code：${text.take(200)}")
         if (code !in 200..299) throw IllegalStateException(explainHttpError(code, text))
 
         val json = try {
             JSONObject(text)
         } catch (e: Exception) {
-            throw IllegalStateException("后端返回的内容没法解析（HTTP $code），请重试或改用手动填写。")
+            throw IllegalStateException("后端返回的内容没法解析（HTTP $code），请重试或改用文字描述交给教练。")
         }
         val error = json.optString("error")
         if (error.isNotBlank()) {
             // vision_unavailable（没配视觉模型 / 模型调用失败）等：把后端的中文原因原样交给界面
             throw IllegalStateException(
                 json.optString("message").takeIf { it.isNotBlank() }
-                    ?: "照片估算失败（$error），请重试或改用手动填写。"
+                    ?: "照片估算失败（$error），请重试或改用文字描述交给教练。"
             )
         }
         val estimateJson = json.optJSONObject("estimate")
-            ?: throw IllegalStateException("后端没有返回估算结果，请重试或改用手动填写。")
+            ?: throw IllegalStateException("后端没有返回估算结果，请重试或改用文字描述交给教练。")
         return parseEstimate(estimateJson)
     } finally {
         conn.disconnect()
@@ -1154,6 +1045,8 @@ private fun multipartBody(
 private fun readResponse(conn: HttpURLConnection): String {
     val stream = try {
         conn.inputStream
+    } catch (e: CancellationException) {
+        throw e                       // 协程取消不是"读不到响应"，不能在这里被吞掉
     } catch (e: Exception) {
         conn.errorStream ?: return ""
     }
@@ -1179,14 +1072,14 @@ private fun explainHttpError(code: Int, body: String): String {
         in 500..599 -> "后端处理照片时出错了"
         else -> "照片上传失败"
     }
-    return serverMessage ?: "$hint（HTTP $code），请重试或改用手动填写。"
+    return serverMessage ?: "$hint（HTTP $code），请重试或改用文字描述交给教练。"
 }
 
 /**
  * 解析 estimate。
  *
- * total 缺失、或"没有任何菜且合计热量为 0"都当失败：那种结果存进去只是一条空记录，
- * 让用户重试或手动填写比让他存一条 0 kcal 更诚实。
+ * total 缺失、或"没有任何菜且合计热量为 0"都当失败：那种结果没有任何信息量，
+ * 让用户重试或改用文字描述比给他看一行 0 kcal 更诚实。**不补默认值、不猜菜品**。
  */
 private fun parseEstimate(o: JSONObject): PhotoEstimate {
     val items = mutableListOf<PhotoItem>()
@@ -1205,7 +1098,7 @@ private fun parseEstimate(o: JSONObject): PhotoEstimate {
         }
     }
     val total = o.optJSONObject("total")
-        ?: throw IllegalStateException("后端返回的估算里没有合计，请重试或改用手动填写。")
+        ?: throw IllegalStateException("后端返回的估算里没有合计，请重试或改用文字描述交给教练。")
     val estimate = PhotoEstimate(
         items = items,
         kcal = total.optDouble("kcal", 0.0),
@@ -1217,7 +1110,7 @@ private fun parseEstimate(o: JSONObject): PhotoEstimate {
         note = o.optString("note"),
     )
     if (items.isEmpty() && estimate.kcal <= 0.0) {
-        throw IllegalStateException("这次没有识别出任何食物，请换一张照片重试，或改用手动填写。")
+        throw IllegalStateException("这次没有识别出任何食物，请换一张照片重试，或改用文字描述交给教练。")
     }
     return estimate
 }

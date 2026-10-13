@@ -165,7 +165,18 @@ def summarize(rec: Record, targets: dict[str, float], profile: dict[str, Any]) -
         desc = str(meta.get("desc") or "").strip()
         kcal = rec.meta_num("kcal")
         prot = rec.meta_num("protein_g")
-        sub = f"{desc} · {prot:.0f} g 蛋白" if desc else f"{kcal:.0f} kcal · 蛋白 {prot:.0f} g"
+        # 营养数字来自教练估算，可能还没回来（或用户只描述了没拍照）。
+        # 那种情况下**不要显示"0 g 蛋白"**——0 会被读成"这餐没有蛋白质"，
+        # 而事实是"还没有数据"，两者意思完全不同。
+        has_macros = kcal > 0 or prot > 0
+        if desc and has_macros:
+            sub = f"{desc} · {prot:.0f} g 蛋白"
+        elif desc:
+            sub = f"{desc} · 待教练估算"
+        elif has_macros:
+            sub = f"{kcal:.0f} kcal · 蛋白 {prot:.0f} g"
+        else:
+            sub = "待教练估算"
         return {"title": slot_cn, "subtitle": sub, "value": round(kcal), "unit": "kcal"}
     if rtype == "water":
         ml = rec.meta_num("amount_ml")

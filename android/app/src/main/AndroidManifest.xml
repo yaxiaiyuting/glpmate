@@ -26,11 +26,6 @@
             android:windowSoftInputMode="adjustNothing"
             android:theme="@style/Theme.GlpMate">
 
-        <!-- 仅调试构建启用：跳过通知权限弹窗，便于屏幕锁定状态下验证界面。
-             正式构建不带这一项（见 app/build.gradle.kts 的 manifestPlaceholders）。 -->
-        <meta-data
-            android:name="glpmate.skipNotificationPrompt"
-            android:value="${skipNotificationPrompt}" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -51,5 +46,23 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
-    </application>
+
+</application>
+
+    <!--
+    Android 11+ 的包可见性：不声明 <queries> 的话，系统会把未声明的 intent
+    过滤掉，于是"拍照"直接抛 ActivityNotFoundException 或静默无反应。
+
+    TakePicturePreview() 用的是 android.media.action.IMAGE_CAPTURE，所以必须声明。
+    这里**故意不写具体的 <package>**——写死了只有那一个相机 App 可用，
+    用户装了别的相机（或系统相机不在该包里）就又会打不开。
+    GetContent("image/*") 用的 ACTION_GET_CONTENT 由系统自己处理，不需要声明。
+
+    （这个坑的代价：拍照功能一直点不开，而且不会有任何报错日志。）
+    -->
+    <queries>
+    <intent>
+        <action android:name="android.media.action.IMAGE_CAPTURE" />
+    </intent>
+    </queries>
 </manifest>

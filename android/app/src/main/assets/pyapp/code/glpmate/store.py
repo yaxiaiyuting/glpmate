@@ -16,6 +16,7 @@ from typing import Any, Iterable, Optional, Sequence
 
 from . import config as cfg
 from . import drugs
+from .nutrition import nutrition_payload
 from .models import (
     Record,
     daily_totals,
@@ -431,6 +432,14 @@ class Store:
             "settings": self.settings(mask=True),
             "targets": targets,
             "schedule": self.schedule(),
+            # 营养达标：对照《中国居民膳食指南（2022）》的供能比与推荐量。
+            # 蛋白质目标按**调整体重**算（见 nutrition.py 的说明），所以要把身高传进去。
+            "nutrition": nutrition_payload(
+                totals,
+                targets,
+                latest_weight,
+                height_cm=profile.get("height_cm"),
+            ),
             "today_stats": {
                 "calories": {"v": totals["kcal"], "t": targets["calories"]},
                 "protein": {"v": totals["protein_g"], "t": targets["protein_g"]},

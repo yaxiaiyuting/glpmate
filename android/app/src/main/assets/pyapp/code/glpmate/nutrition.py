@@ -302,3 +302,155 @@ def nutrition_payload(
         })
     payload["gaps"] = gaps
     return payload
+
+
+# ---------------------------------------------------------------- 体重下降预测
+#
+# ============ 这里回答的问题是"我大概会瘦多少" ============
+#
+# 热量缺口那一套（7700 kcal/kg）只描述**能量账**：吃进来比消耗少多少，
+# 理论上对应多少体重。但 GLP-1 用药者实际掉秤往往比这个账算出来的快，
+# 原因不止"吃得少"：胃排空变慢、饱腹信号增强、部分人能耗结构也变了。
+# 所以只报能量缺口会系统性低估。
+#
+# 这里换一个角度，用**说明书/III 期试验的实测终点**来估：
+#
+#   SURMOUNT-1（72 周，n=2539，BMI≥30 或 ≥27 且有合并症）：
+#     安慰剂  -3.1%
+#     5 mg   -15.0%
+#     10 mg  -19.5%
+#     15 mg  -20.9%
+#
+# 这是"用了 72 周之后大概到哪"，比能量账更贴近用户真正关心的问题。
+#
+# ---------- 哪些是实测、哪些是拟合（必须说清）----------
+# 实测：上面四个百分数是试验终点值，逐条带出处（见 sources()）。
+# 拟合：**时间曲线**。试验的公开摘要只给终点百分比，没有第 20/40/60 周的分段数据，
+#       所以时间轴采用一条饱和曲线（早期掉得快、之后趋平，这是 GLP-1 类药物的
+#       公认形状），时间常数按"第 36 周约完成 60%"标定。
+#       这条曲线只用来给"什么时候会到哪"一个量级感，**不是试验数据**。
+#       与其编几个假的时间点，不如把拟合这件事写在界面上。
+
+# 试验终点（72 周）的体重变化百分比，按剂量。负值 = 下降。
+SURMOUNT_72W_PCT: dict[float, float] = {
+    0.0: -3.1,     # 安慰剂
+    5.0: -15.0,
+    10.0: -19.5,
+    15.0: -20.9,
+}
+
+SURMOUNT_TRIAL = {
+    "name": "SURMOUNT-1",
+    "n": 2539,
+    "weeks": 72,
+    "population": "成人，BMI≥30 或 BMI 27–30 且至少一项体重相关合并症；"
+                  "基线平均体重 104.8 kg、平均 BMI 38.0",
+    "source": "SURMOUNT-1（III 期，72 周）。数字与原文引用见 efficacy_data。",
+    "caveat": "试验人群的基线 BMI 是 38.0。基线 BMI 越高，同样的百分比对应的"
+              "绝对公斤数越大；基线越低则相反。这是群体平均值，个体差异很大。",
+}
+
+# 时间曲线的形状参数（周）。只决定"多快趋平"，不决定终点。
+#
+# ============ 标定方式：归一化到终点，而不是调 τ ============
+# 单纯用 f(t) = endpoint × (1 − e^(−t/τ)) 的话，第 72 周永远到不了 endpoint，
+# 因为 e^(−72/τ) 恒大于 0：
+#     τ=34.4 → 72 周只到终点的 87.7%，即 −18.32% 而非 −20.9%（低了 2.6 个百分点）
+#     想让它接近 1 需要 τ ≥ 300，可那样曲线几乎是直线，失去"早期快、后期平"的形状
+# 所以改成**除以自己在 72 周处的值**做归一化：
+#     f(t) = endpoint × (1 − e^(−t/τ)) / (1 − e^(−72/τ))
+# 这样 f(72) 由构造精确等于 endpoint（唯一有实测数据的地方严格吻合），
+# τ 只负责形状。代价是 t > 72 周时会略超过终点（104 周约 108%），
+# 这对"继续用药还会再降一点"是合理的外推。
+#
+# （这个坑踩了两次：第一版把"第 36 周完成 61%"当标定条件，72 周偏了 15%。）
+_TRAJECTORY_TAU_WEEKS = 34.4
+
+
+def _trial_pct_for_dose(dose_mg: float) -> tuple[float, float]:
+    """取最接近的试验剂量组，返回 (该组终点百分比, 实际使用的剂量)。
+
+    不做剂量间的线性插值：试验只测了 5/10/15 三个固定剂量组，
+    在它们之间插值等于编造没测过的剂量组的数据。取最接近的一组更诚实。
+    """
+    if dose_mg <= 0:
+        return SURMOUNT_72W_PCT[0.0], 0.0
+    tested = sorted(SURMOUNT_72W_PCT.keys() - {0.0})
+    # 距离相同时取**更高**的那一组：安慰剂/低剂量组的降幅更小，
+    # 取高组不夸大预期（12.5 mg 距 10 和 15 都是 2.5，取 15）。
+    dose = min(tested, key=lambda d: (abs(d - dose_mg), -d))
+    return SURMOUNT_72W_PCT[dose], dose
+
+
+def expected_weight_loss_pct(weeks: float, dose_mg: float) -> dict[str, Any]:
+    """用药 [weeks] 周、当前剂量 [dose_mg] 时，预计的体重变化百分比。
+
+    返回值里同时给出终点值和曲线参数，界面要能把"实测终点"和"拟合曲线"分开显示。
+    """
+    end_pct, used_dose = _trial_pct_for_dose(dose_mg)
+    weeks = max(0.0, float(weeks or 0.0))
+    import math as _math
+    # 归一化饱和曲线：f(0)=0，f(72周)=endpoint（精确），t>72 周略超终点
+    _norm = 1.0 - _math.exp(-SURMOUNT_TRIAL["weeks"] / _TRAJECTORY_TAU_WEEKS)
+    shape = (1.0 - _math.exp(-weeks / _TRAJECTORY_TAU_WEEKS)) / _norm
+    return {
+        "pct": round(end_pct * shape, 2),
+        "endpoint_pct": end_pct,
+        "endpoint_weeks": SURMOUNT_TRIAL["weeks"],
+        "used_dose_mg": used_dose,
+        "requested_dose_mg": dose_mg,
+        "is_extrapolated_curve": True,
+    }
+
+
+def weight_forecast(
+    start_weight_kg: Optional[float],
+    current_weight_kg: Optional[float],
+    weeks_on_treatment: float,
+    dose_mg: float,
+    deficit_kcal: Optional[float] = None,
+) -> dict[str, Any]:
+    """把"试验预期"和"能量缺口推算"并排放，并解释两者的差别。
+
+    刻意给**两个**数字而不是一个：
+      - 试验预期：按说明书/III 期数据的群体平均，回答"一般会瘦多少"
+      - 能量缺口：按 7700 kcal/kg 的账，回答"照现在的吃法，账面上应该瘦多少"
+    两者不一致是正常的，而且不一致本身有信息量：
+    缺口算出来的偏慢，正说明药物带来的减重不只来自"吃得少"。
+    只报其中一个都会误导——只报缺口会低估，只报试验值会让人以为与吃多少无关。
+    """
+    trial = expected_weight_loss_pct(weeks_on_treatment, dose_mg)
+    out: dict[str, Any] = {
+        "trial": trial,
+        "trial_meta": SURMOUNT_TRIAL,
+        "weeks": round(max(0.0, float(weeks_on_treatment or 0.0)), 1),
+    }
+
+    # 基线用起始体重，缺失时退回当前体重——只填过一次体重的新用户也能看到预测。
+    # 试验的百分比是相对**基线**算的，所以基准必须是起始值而不是当前值。
+    base = start_weight_kg if (start_weight_kg and start_weight_kg > 0) else current_weight_kg
+    if base and base > 0:
+        pct = trial["pct"]
+        expected_kg = base * pct / 100.0
+        out["basis_weight_kg"] = round(base, 1)
+        out["basis_is_start_weight"] = bool(start_weight_kg and start_weight_kg > 0)
+        out["expected_loss_kg"] = round(expected_kg, 1)
+        out["expected_weight_kg"] = round(base + expected_kg, 1)
+        # 瘦体重约占减重的 25%（SURMOUNT-1 的 DXA 子研究，n=160）
+        out["lean_mass_loss_kg"] = round(expected_kg * 0.25, 1)
+        out["fat_mass_loss_kg"] = round(expected_kg * 0.75, 1)
+        out["composition_source"] = (
+            "瘦体重约占减重量的 25%：SURMOUNT-1 DXA 子研究（n=160）"
+        )
+    if current_weight_kg and start_weight_kg:
+        out["actual_loss_kg"] = round(start_weight_kg - current_weight_kg, 1)
+
+    if deficit_kcal is not None and deficit_kcal > 0 and weeks_on_treatment and weeks_on_treatment > 0:
+        # 能量账：缺口 × 天数 / 7700
+        deficit_kg = deficit_kcal * 7.0 * weeks_on_treatment / KCAL_PER_KG
+        out["deficit_estimate_kg"] = round(deficit_kg, 1)
+        out["deficit_note"] = (
+            "能量账只算「吃得少」这一部分，不含药物对胃排空、饱腹信号和能耗的影响，"
+            "所以通常低于试验预期——两者差得越多，说明减重里「药物作用」的占比越大。"
+        )
+    return out

@@ -16,7 +16,7 @@ from typing import Any, Iterable, Optional, Sequence
 
 from . import config as cfg
 from . import drugs
-from .nutrition import nutrition_payload
+from .nutrition import nutrition_payload, weight_forecast
 from .models import (
     Record,
     daily_totals,
@@ -439,6 +439,18 @@ class Store:
                 targets,
                 latest_weight,
                 height_cm=profile.get("height_cm"),
+            ),
+            # 体重下降预测：用 SURMOUNT-1 的实测终点，而不是只算能量账。
+            # 两个数字都给出并解释差异（见 nutrition.weight_forecast 的说明）。
+            "weight_forecast": weight_forecast(
+                start_weight,
+                latest_weight,
+                weeks_on_treatment=max(0.0, (today - t_start).days / 7.0),
+                dose_mg=float(profile.get("dose_mg") or 0.0),
+                deficit_kcal=(
+                    (targets["calories"] - totals["kcal"])
+                    if targets.get("calories") and totals.get("kcal") else None
+                ),
             ),
             "today_stats": {
                 "calories": {"v": totals["kcal"], "t": targets["calories"]},

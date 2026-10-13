@@ -9,14 +9,18 @@
 from __future__ import annotations
 
 import pathlib
+import shutil
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
+from glpmate.store import Store  # noqa: E402
 from glpmate.nutrition import (  # noqa: E402
     AMDR, DEFICIT_COMFORT_MAX, DEFICIT_WARN_FAST, FIBER_MIN_G, KCAL_PER_KG,
-    adjusted_weight_kg, amdr_status, nutrition_payload, protein_target_g, sources,
+    adjusted_weight_kg, amdr_status, expected_weight_loss_pct, nutrition_payload,
+    protein_target_g, sources, weight_forecast,
 )
 
 
@@ -193,3 +197,128 @@ class MultiDayTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class WeightForecastTest(unittest.TestCase):
+    """体重下降预测（用说明书/III 期试验的实测终点，而不是只算能量账）。
+
+    设计上有两条底线：
+      1. 第 72 周必须**精确命中**试验报告的终点百分比——那是唯一有实测数据的地方，
+         曲线不能在数据点上偏离（第一版就偏了 15%，等于把说明书数据改小了）。
+      2. 剂量只能取**测过的**组（5/10/15/安慰剂），不做线性插值——
+         插值等于编造没测过的剂量组的数据。
+    """
+
+    def test_endpoint_matches_the_trial_at_72_weeks(self):
+        """72 周必须等于 SURMOUNT-1 报告的终点值。"""
+        for dose, want in ((5.0, -15.0), (10.0, -19.5), (15.0, -20.9)):
+            with self.subTest(dose=dose):
+                got = expected_weight_loss_pct(72, dose)["pct"]
+                self.assertAlmostEqual(got, want, places=1,
+                                       msg=f"{dose} mg 第 72 周算出 {got}%，试验是 {want}%")
+
+    def test_placebo_arm_is_a_real_arm_not_zero(self):
+        """0 mg（未用药/对照）不是"不瘦"，试验里安慰剂组也掉了 3.1%。
+
+        这条防的是"剂量为 0 就返回 0%"这种想当然的写法——
+        它会让用户以为不吃药体重完全不动。
+        """
+        self.assertAlmostEqual(expected_weight_loss_pct(72, 0.0)["pct"], -3.1, places=1)
+
+    def test_dose_picks_the_nearest_tested_arm(self):
+        """没测过的剂量取最近的组，而不是插值。"""
+        self.assertEqual(expected_weight_loss_pct(72, 12.5)["used_dose_mg"], 15.0)
+        self.assertEqual(expected_weight_loss_pct(72, 7.5)["used_dose_mg"], 10.0)
+        self.assertEqual(expected_weight_loss_pct(72, 2.5)["used_dose_mg"], 5.0)
+        # 12.5 mg 是说明书里的剂量阶梯，但试验没有这一组，所以必须向上取整到 15
+        got = expected_weight_loss_pct(72, 12.5)["pct"]
+        self.assertAlmostEqual(got, -20.9, places=1)
+
+    def test_trajectory_is_monotonic_and_starts_at_zero(self):
+        """曲线要单调下降（不会先瘦后胖），且第 0 周为 0。"""
+        self.assertAlmostEqual(expected_weight_loss_pct(0, 15.0)["pct"], 0.0, places=6)
+        prev = 0.0
+        for w in range(0, 105, 4):
+            cur = expected_weight_loss_pct(w, 15.0)["pct"]
+            self.assertLessEqual(cur, prev + 1e-9, f"第 {w} 周比上一段还高")
+            prev = cur
+
+    def test_curve_is_flagged_as_fitted(self):
+        """时间曲线是拟合，不是试验数据——必须能被界面识别出来并标注。"""
+        r = expected_weight_loss_pct(24, 15.0)
+        self.assertTrue(r["is_extrapolated_curve"])
+        self.assertEqual(r["endpoint_weeks"], 72)
+
+    def test_forecast_reports_both_estimates(self):
+        """试验预期与能量账要**同时**给，并说明两者为什么会不一样。
+
+        只报能量账会系统性低估（它只算"吃得少"，不含药物对胃排空、
+        饱腹信号的影响）；只报试验值会让人以为减重与吃多少无关。
+        """
+        f = weight_forecast(144.0, 143.0, weeks_on_treatment=12, dose_mg=15.0,
+                            deficit_kcal=800.0)
+        self.assertIn("expected_loss_kg", f)
+        self.assertIn("deficit_estimate_kg", f)
+        self.assertIn("deficit_note", f)
+        self.assertIn("能量账", f["deficit_note"])
+
+    def test_composition_split_is_reported(self):
+        """要给出瘦体重/脂肪的拆分——GLP-1 用药期掉肌肉是真实风险。"""
+        f = weight_forecast(100.0, 100.0, weeks_on_treatment=72, dose_mg=15.0)
+        # 注意：expected_loss_kg 是负数（表示下降），拆分出来的两个也是负数，
+        # 所以两边都要取绝对值再比。
+        self.assertAlmostEqual(
+            abs(f["lean_mass_loss_kg"]) + abs(f["fat_mass_loss_kg"]),
+            abs(f["expected_loss_kg"]), places=1)
+        self.assertAlmostEqual(abs(f["lean_mass_loss_kg"]) / abs(f["expected_loss_kg"]),
+                               0.25, places=2)
+
+    def test_trial_caveat_is_attached(self):
+        """必须带上人群说明——试验基线 BMI 38，用户 BMI 不同则百分比不代表同样公斤数。"""
+        f = weight_forecast(100.0, 100.0, weeks_on_treatment=52, dose_mg=10.0)
+        self.assertIn("BMI", f["trial_meta"]["population"])
+        self.assertIn("BMI", f["trial_meta"]["caveat"])
+
+    def test_missing_weight_does_not_crash(self):
+        f = weight_forecast(None, None, weeks_on_treatment=12, dose_mg=15.0)
+        self.assertNotIn("expected_loss_kg", f)
+        self.assertIn("trial", f)
+
+class WeightForecastIntegrationTest(unittest.TestCase):
+    """weight_forecast 接进 bootstrap 之后仍要能出数字。
+
+    这一条是为一个真实缺口加的：只依赖 /api/weight 的**起始体重**时，
+    没填过 profile.start_weight_kg 的用户会拿不到任何预测（KeyError 级别的缺失，
+    不是 0）。所以基线要能退回当前体重。
+    """
+
+    def setUp(self) -> None:
+        self.tmp = pathlib.Path(tempfile.mkdtemp())
+        self.store = Store(self.tmp / "t.db")
+
+    def tearDown(self) -> None:
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_bootstrap_exposes_forecast(self):
+        from datetime import date, timedelta
+        today = date.today()
+        self.store.save_profile({"height_cm": 185.0, "target_weight_kg": 80.0, "dose_mg": 15.0})
+        self.store.add_record({
+            "type": "weight", "at": f"{today - timedelta(days=60)}T08:00:00",
+            "value": 120.0, "unit": "kg", "meta": {},
+        })
+        self.store.add_record({
+            "type": "dose", "at": f"{today - timedelta(days=60)}T12:00:00",
+            "value": 15.0, "unit": "mg",
+            "meta": {"dose_mg": 15.0, "med_name": "替尔泊肽", "skipped": False},
+        })
+        w = self.store.bootstrap()["weight_forecast"]
+        self.assertIn("trial", w)
+        self.assertIn("expected_loss_kg", w, "只填过体重记录时也必须能给出预测")
+        self.assertLess(w["expected_loss_kg"], 0)
+        self.assertIn("lean_mass_loss_kg", w)
+
+    def test_forecast_survives_empty_database(self):
+        """全新库（没有用药、没有体重）不能崩。"""
+        w = self.store.bootstrap()["weight_forecast"]
+        self.assertIn("trial", w)
+        self.assertEqual(w["weeks"], 0.0)

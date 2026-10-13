@@ -1,5 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 读取相册图片。
+         Android 13+ 用 READ_MEDIA_IMAGES（细分后的图片权限），13 以下退回
+         READ_EXTERNAL_STORAGE（用 maxSdkVersion 限定，避免在新系统上要一个已被忽略的权限）。
+
+         为什么需要：选图本身靠 SAF/选择器的 URI 授权就够，**但"按媒体 ID 兜底"那条路
+         要用 MediaStore 查图片，没有这个权限必然失败**（部分厂商选择器
+         如 ColorOS 的 picker_get_content 返回的 URI 直连读不到，只能走兜底）。
+         没有它，兜底等于不存在。 -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 提醒推送：用 AlarmManager + 本地通知，不引 WorkManager（少一个依赖，
          而且提醒时间是用户设定的固定钟点，不需要 JobScheduler 那套约束） -->

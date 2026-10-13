@@ -1,11 +1,19 @@
 package com.glpmate.native_app.ui
 
+import android.Manifest
+import android.content.ContentUris
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import android.util.Log
 import androidx.activity.compose.BackHandler
+import java.io.InputStream
+
+import androidx.core.content.ContextCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -179,8 +187,10 @@ fun FoodEntryOverlay(
 
     /** 打开相机，并把"打不开"的原因如实告诉用户，而不是静默无反应。 */
     val openCamera: () -> Unit = {
+        Log.i(TAG, "openCamera 被调用")
         try {
             takePicture.launch(null)
+            Log.i(TAG, "takePicture.launch 返回（没有抛异常）")
         } catch (e: android.content.ActivityNotFoundException) {
             Log.w(TAG, "相机的 ActivityNotFoundException：这台设备没有能响应 IMAGE_CAPTURE 的应用", e)
             st.photo = PhotoStage.Failed(
@@ -194,8 +204,38 @@ fun FoodEntryOverlay(
         }
     }
 
-    // 相册：GetContent("image/*") 返回 Uri，解码 / 缩放 / 压缩都在 IO 线程做
-    val pickFromGallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    // 读取相册图片的运行时权限。
+    //
+    // **被拒也要继续选图**：SAF（OpenDocument）给的 URI 授权本身就够读那张图，
+    // 这个权限只影响"按媒体 ID 兜底"那条路（部分厂商选择器返回的 URI 直连读不到，
+    // 只能换成 MediaStore 的标准 Uri）。所以拒绝 = 兜底失效，而不是功能失效——
+    // 因此不阻断流程，只在日志里留痕，失败时给的中文提示会说清可以换一张。
+    val imagePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        Manifest.permission.READ_MEDIA_IMAGES
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+    var mediaPermissionGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, imagePermission) ==
+                PackageManager.PERMISSION_GRANTED,
+        )
+    }
+    val requestImagePermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        mediaPermissionGranted = granted
+        Log.i(TAG, "相册读取权限 ${imagePermission} 申请结果：$granted")
+    }
+
+    // 相册：用 **OpenDocument（SAF）而不是 GetContent**。
+    //
+    // 真机上踩过：ColorOS 的相册选择器返回
+    //   content://media/picker_get_content/0/com.coloros.gallery3d.photopicker/media/2267
+    // 这种 URI，GetContent（ACTION_GET_CONTENT）返回的它**没有可用的读权限**，
+    // resolver.openInputStream() 直接返回 null，界面报"打不开这张图片"。
+    // OpenDocument 走 ACTION_OPEN_DOCUMENT，是 SAF 的标准入口，URI 授权更可靠。
+    val pickFromGallery = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         // 这条路径上有三处可能失败（选择器打不开 / 返回 null / Uri 读不了），
         // 而它们的表现都是"没反应"。加日志让真凶自己暴露，同时把打不开变成中文提示。
         Log.i(TAG, "相册返回 uri=$uri")
@@ -208,8 +248,19 @@ fun FoodEntryOverlay(
 
     /** 打开相册，并把"打不开"的原因如实告诉用户。 */
     val openGallery: () -> Unit = {
+        Log.i(TAG, "openGallery 被调用（权限=$mediaPermissionGranted）")
+        // 没有权限就先问一次；无论结果如何都继续打开选择器——
+        // 选图本身不依赖它（见上方说明）。
+        if (!mediaPermissionGranted) {
+            try {
+                requestImagePermission.launch(imagePermission)
+            } catch (e: Exception) {
+                Log.w(TAG, "权限申请启动失败：${e.javaClass.simpleName}")
+            }
+        }
         try {
-            pickFromGallery.launch("image/*")
+            pickFromGallery.launch(arrayOf("image/*"))
+            Log.i(TAG, "pickFromGallery.launch 返回（没有抛异常）")
         } catch (e: android.content.ActivityNotFoundException) {
             Log.w(TAG, "相册的 ActivityNotFoundException：这台设备没有能处理 ACTION_GET_CONTENT 的应用", e)
             st.photo = PhotoStage.Failed(
@@ -908,20 +959,73 @@ private fun bitmapToJpeg(bitmap: Bitmap): ByteArray =
  * 先只读图片头（inJustDecodeBounds）算出采样率再真正解码：直接 decodeStream 一张
  * 5000 万像素的照片会 OOM。整个过程只在 Dispatchers.IO 上跑。
  */
+/**
+ * 打开图片流，带**按媒体 ID 兜底**。
+ *
+ * ============ 为什么需要兜底（真机踩过）============
+ * ColorOS 的相册选择器返回的 Uri 形如
+ *   content://media/picker_get_content/0/com.coloros.gallery3d.photopicker/media/2267
+ * 这种 Uri 直接 openInputStream 会失败（返回 null），报"打不开这张图片"。
+ * 但它的**最后一段就是媒体库里的图片 ID**，用 MediaStore 的标准 Uri 就能读到同一张图。
+ * 所以失败时退一步：解析出 ID，换成 content://media/external/images/media/<id> 再试。
+ *
+ * 这个兜底只在直连失败时触发，不会影响正常路径；两条都失败时返回 null，
+ * 由调用方给出中文原因。
+ */
+private fun openImageStream(context: Context, uri: Uri): InputStream? {
+    val resolver = context.contentResolver
+
+    // 1) 正常路径：直接用拿到的 Uri
+    try {
+        resolver.openInputStream(uri)?.let { return it }
+        Log.w(TAG, "openInputStream 返回 null：${uri.scheme}://${uri.authority}")
+    } catch (e: SecurityException) {
+        Log.w(TAG, "直接读被拒（SecurityException）：${uri.scheme}://${uri.authority}")
+    } catch (e: Exception) {
+        Log.w(TAG, "直接读失败（${e.javaClass.simpleName}）：${e.message}")
+    }
+
+    // 2) 兜底：从 Uri 末段取媒体 ID，换成 MediaStore 的标准 Uri
+    val mediaId = uri.lastPathSegment?.toLongOrNull()
+    if (mediaId != null) {
+        for (base in listOf(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            MediaStore.Images.Media.INTERNAL_CONTENT_URI,
+        )) {
+            try {
+                val candidate = ContentUris.withAppendedId(base, mediaId)
+                resolver.openInputStream(candidate)?.let {
+                    Log.i(TAG, "兜底成功：按媒体 ID $mediaId 读到了图片")
+                    return it
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "兜底失败（$base, id=$mediaId）：${e.javaClass.simpleName}")
+            }
+        }
+    } else {
+        Log.w(TAG, "Uri 末段不是数字，无法按媒体 ID 兜底：${uri.lastPathSegment}")
+    }
+    return null
+}
+
 private fun uriToJpeg(context: Context, uri: Uri): ByteArray {
     val resolver = context.contentResolver
     try {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-            ?: throw IllegalStateException("打不开这张图片，请换一张或改用文字描述交给教练。")
+        // 先按拿到的 Uri 试；失败再按媒体 ID 兜底（见 openImageStream 的说明）
+        openImageStream(context, uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+            ?: throw IllegalStateException(
+                "系统没有授予这张图片的读取权限（${uri.scheme}://${uri.authority}）。" +
+                    "请换一张，或直接描述吃了什么交给教练。"
+            )
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
             throw IllegalStateException("这张图片没法解码（可能是不支持的格式），请换一张或改用文字描述交给教练。")
         }
         val options = BitmapFactory.Options().apply {
             inSampleSize = sampleSizeFor(bounds.outWidth, bounds.outHeight, MAX_EDGE)
         }
-        val decoded = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
-            ?: throw IllegalStateException("打不开这张图片，请换一张或改用文字描述交给教练。")
+        val decoded = openImageStream(context, uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+            ?: throw IllegalStateException("这张图片读了一次就读不到了，请重新选择。")
         return compressJpeg(shrinkToMaxEdge(decoded, MAX_EDGE))
     } catch (e: SecurityException) {
         // 相册 Uri 的读权限只在当次选择有效：进程被杀后重开会走到这里

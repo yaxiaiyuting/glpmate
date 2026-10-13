@@ -37,7 +37,7 @@ object PythonBackend {
      * 所以这里用**源码内容的哈希**：任何 .py 改动都会自动触发重新解压。
      * 当前哈希：f81be186134f
      */
-    private const val STAMP_VERSION = "code-4e2b8ede1dc6"
+    private const val STAMP_VERSION = "code-8db77ed00c33"
     private const val PORT = 8848
 
     @Volatile

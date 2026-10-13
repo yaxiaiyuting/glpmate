@@ -318,7 +318,11 @@ def context_text(ctx: dict[str, Any]) -> str:
     lv = ctx.get("level") or {}
     if lv:
         lines.append(
-            f"体内水平估算：当前约为稳态峰值的 {lv.get('pct_peak')}%（{lv.get('current_mg')} mg 等效），"
+            # 必须用 pct_max（稳态峰值 = 100%），和界面上那个大数字同一口径。
+            # 曾经用的是 pct_peak（稳态谷值 = 100%），于是教练看到的百分比是
+            # 界面的 2.4 倍——模型会拿"130%"去讨论一个用户屏幕上写着"55%"的数，
+            # 两边对不上，回答自然驴唇不对马嘴。
+            f"体内水平估算：当前约为稳态峰值的 {lv.get('pct_max')}%（{lv.get('current_mg')} mg 等效），"
             f"趋势 {lv.get('trend')}；该值由 {lv.get('half_life_hours')} 小时半衰期的一室模型推算，仅供观察趋势"
         )
     w = ctx.get("weight") or {}

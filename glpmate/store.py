@@ -544,12 +544,20 @@ class Store:
         doses = self.all_dose_records()
         events = project_events(doses, today, profile, horizon_days=7)
         half_life = float(profile.get("half_life_hours") or 165.0)
+        # tmax 必须显式取出来传给下面几个函数。
+        #
+        # 这里曾经漏掉这行（改曲线起点时误删），后果是**教练完全不可用**：
+        # 每次发消息都在 build_context → level_summary 抛 NameError，
+        # 界面只显示「发送失败: name 'tmax' is not defined」。
+        # 之所以没被测出来：教练路径需要 API key，原有 81 个测试没有一个碰过它。
+        # 现在 tests/test_coach_context.py 会在无 key 的情况下把整条上下文链路跑通。
+        tmax = float(profile.get("tmax_hours") or 24.0)
         interval = float(profile.get("dose_interval_days") or 7) * 24.0
-        baseline = steady_state_trough(events, half_life, interval)
-        top = theoretical_max(events, half_life, interval)
+        baseline = steady_state_trough(events, half_life, interval, tmax)
+        top = theoretical_max(events, half_life, interval, tmax)
         from .models import level_at
         now = datetime.now().replace(microsecond=0)
-        mg_now = level_at(now, events, half_life) if events else 0.0
+        mg_now = level_at(now, events, half_life, tmax) if events else 0.0
         # 趋势看最近一次给药前后：刚打完在积累，接近下次给药时在回落
         recent = [(r.at, level_at(r.at, events, half_life, tmax)) for r in doses[-3:]]
         trend = "持平"

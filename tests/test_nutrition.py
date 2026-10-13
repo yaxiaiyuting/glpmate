@@ -322,3 +322,72 @@ class WeightForecastIntegrationTest(unittest.TestCase):
         w = self.store.bootstrap()["weight_forecast"]
         self.assertIn("trial", w)
         self.assertEqual(w["weeks"], 0.0)
+
+class GoalProjectionTest(unittest.TestCase):
+    """目标体重能不能到、要多久。
+
+    这个功能的意义是**给一张基于真实数据的参照**，而不是打击用户。
+    所以两条要求：数字要有出处、措辞不能替用户下结论。
+    """
+
+    def test_goal_beyond_trial_endpoint_is_flagged_not_hidden(self):
+        """目标超过试验终点时必须如实说明，而不是悄悄给个好看的数字。
+
+        144kg / 185cm 的人想到 80kg 需要减 44.4%，而 SURMOUNT-1 在 72 周的
+        实测平均是 20.9%（15mg 组）。隐瞒这个差距等于让用户按不现实的预期努力。
+        """
+        f = weight_forecast(144.0, 144.0, 2 / 7, 2.5,
+                            target_weight_kg=80.0, max_dose_mg=15.0)
+        g = f["goal"]
+        self.assertFalse(g["reachable_within_trial"])
+        self.assertAlmostEqual(g["need_pct"], 44.4, places=1)
+        self.assertGreater(g["ratio_vs_trial"], 2.0)
+        # 措辞要中性、给出路，不能是宣判
+        self.assertIn("医生", g["note"])
+        self.assertIn("个体差异", g["note"])
+
+    def test_goal_uses_max_dose_not_current_dose(self):
+        """目标要按剂量阶梯上限算，不是当前剂量。
+
+        用药初期还在滴定（替尔泊肽 2.5 → 15 mg）。拿 2.5mg 去比目标会得到
+        "需要终点值的 2.96 倍"，而按 15mg 是 2.13 倍——前者对用户不公平，
+        也不是他最终会面对的数字。
+        """
+        at_low = weight_forecast(144.0, 144.0, 2 / 7, 2.5,
+                                 target_weight_kg=80.0, max_dose_mg=15.0)["goal"]
+        self.assertEqual(at_low["used_dose_mg"], 15.0)
+        self.assertEqual(at_low["basis_dose_mg"], 15.0)
+        self.assertAlmostEqual(at_low["ratio_vs_trial"], 2.13, places=1)
+
+    def test_reachable_goal_gets_a_week_count(self):
+        """目标在试验范围内时要给出预计周数，而不是只说百分比。"""
+        # 144 → 125 kg 需要减 13.2%，在 15mg 组的 20.9% 之内
+        f = weight_forecast(144.0, 144.0, 2 / 7, 15.0,
+                            target_weight_kg=125.0, max_dose_mg=15.0)
+        g = f["goal"]
+        self.assertTrue(g["reachable_within_trial"])
+        self.assertIn("weeks_to_goal", g)
+        self.assertGreater(g["weeks_to_goal"], 0)
+        self.assertLessEqual(g["weeks_to_goal"], 72)
+
+    def test_goal_returns_none_when_already_lighter(self):
+        """目标比基线还重（维持期）时不硬算。"""
+        f = weight_forecast(100.0, 100.0, 52, 15.0,
+                            target_weight_kg=120.0, max_dose_mg=15.0)
+        self.assertNotIn("goal", f)
+
+    def test_milestones_cover_near_term(self):
+        """里程碑必须有 12 / 24 周——72 周太远，指导不了当下。"""
+        f = weight_forecast(144.0, 144.0, 2 / 7, 15.0)
+        weeks = [m["weeks"] for m in f["milestones"]]
+        self.assertEqual(weeks, [12, 24, 72])
+        for m in f["milestones"]:
+            self.assertLess(m["loss_kg"], 0)
+            self.assertLess(m["weight_kg"], 144.0)
+
+    def test_current_dose_projection_is_also_reported(self):
+        """当前剂量能到哪也要给——滴定期这两个数字差很多。"""
+        f = weight_forecast(144.0, 144.0, 2 / 7, 5.0,
+                            target_weight_kg=125.0, max_dose_mg=15.0)
+        self.assertIn("goal_at_current_dose", f)
+        self.assertEqual(f["goal_at_current_dose"]["used_dose_mg"], 5.0)

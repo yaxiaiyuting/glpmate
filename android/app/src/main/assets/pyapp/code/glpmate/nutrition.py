@@ -409,14 +409,16 @@ def weight_forecast(
     weeks_on_treatment: float,
     dose_mg: float,
     deficit_kcal: Optional[float] = None,
+    target_weight_kg: Optional[float] = None,
+    max_dose_mg: Optional[float] = None,
 ) -> dict[str, Any]:
-    """把"试验预期"和"能量缺口推算"并排放，并解释两者的差别。
+    """把「试验预期」和「能量缺口推算」并排放，并解释两者的差别。
 
     刻意给**两个**数字而不是一个：
-      - 试验预期：按说明书/III 期数据的群体平均，回答"一般会瘦多少"
-      - 能量缺口：按 7700 kcal/kg 的账，回答"照现在的吃法，账面上应该瘦多少"
+      - 试验预期：按说明书/III 期数据的群体平均，回答「一般会瘦多少」
+      - 能量缺口：按 7700 kcal/kg 的账，回答「照现在的吃法，账面上应该瘦多少」
     两者不一致是正常的，而且不一致本身有信息量：
-    缺口算出来的偏慢，正说明药物带来的减重不只来自"吃得少"。
+    缺口算出来的偏慢，正说明药物带来的减重不只来自「吃得少」。
     只报其中一个都会误导——只报缺口会低估，只报试验值会让人以为与吃多少无关。
     """
     trial = expected_weight_loss_pct(weeks_on_treatment, dose_mg)
@@ -442,6 +444,22 @@ def weight_forecast(
         out["composition_source"] = (
             "瘦体重约占减重量的 25%：SURMOUNT-1 DXA 子研究（n=160）"
         )
+
+        # ---- 里程碑投影：12 / 24 / 72 周 ----
+        # 72 周太远，只报它无法指导当下。近端里程碑更能用：
+        # 12 周约 3 个月（复诊常见间隔）、24 周半年。
+        marks = []
+        for wk in (12, 24, 72):
+            r = expected_weight_loss_pct(wk, dose_mg)
+            loss = base * r["pct"] / 100.0
+            marks.append({
+                "weeks": wk,
+                "pct": r["pct"],
+                "loss_kg": round(loss, 1),
+                "weight_kg": round(base + loss, 1),
+            })
+        out["milestones"] = marks
+
     if current_weight_kg and start_weight_kg:
         out["actual_loss_kg"] = round(start_weight_kg - current_weight_kg, 1)
 
@@ -453,4 +471,81 @@ def weight_forecast(
             "能量账只算「吃得少」这一部分，不含药物对胃排空、饱腹信号和能耗的影响，"
             "所以通常低于试验预期——两者差得越多，说明减重里「药物作用」的占比越大。"
         )
+
+    # 目标按**剂量阶梯的上限**算，而不是当前剂量。
+    #
+    # 为什么：用药初期还在滴定（替尔泊肽从 2.5 mg 起步，几周后逐步加到 15 mg）。
+    # 拿当前剂量去比目标会严重高估难度——144kg 的用户在第 2 天（2.5mg）看会得到
+    # "需要试验终点值的 2.96 倍"，而按满剂量 15mg 算是 2.13 倍。
+    # 前者对用户不公平，也不是他最终会面对的数字。
+    if max_dose_mg:
+        goal = goal_projection(target_weight_kg, base, max_dose_mg, current_weight_kg)
+        if goal:
+            goal["basis_dose_mg"] = max_dose_mg
+            goal["basis_note"] = f"按剂量阶梯上限 {max_dose_mg:g} mg 估算"
+            out["goal"] = goal
+        # 当前剂量下能到哪，也如实给出来（正在滴定时这两个数字会差很多）
+        cur_goal = goal_projection(target_weight_kg, base, dose_mg, current_weight_kg)
+        if cur_goal and cur_goal.get("weeks_to_goal"):
+            out["goal_at_current_dose"] = {
+                "used_dose_mg": cur_goal["used_dose_mg"],
+                "weeks_to_goal": cur_goal["weeks_to_goal"],
+                "trial_endpoint_pct": cur_goal["trial_endpoint_pct"],
+            }
+    else:
+        goal = goal_projection(target_weight_kg, base, dose_mg, current_weight_kg)
+        if goal:
+            out["goal"] = goal
+    return out
+
+
+def goal_projection(
+    target_weight_kg: Optional[float],
+    basis_weight_kg: Optional[float],
+    dose_mg: float,
+    current_weight_kg: Optional[float] = None,
+) -> Optional[dict[str, Any]]:
+    """到目标体重需要减多少、大概多久。
+
+    刻意给出「多久」而不是只给一个百分比对比：用户想知道的是
+    「照这个方案，我什么时候能到」，哪怕答案是「比试验数据支持的时间长得多」。
+    """
+    import math as _math
+    if not target_weight_kg or not basis_weight_kg or basis_weight_kg <= 0:
+        return None
+    if target_weight_kg >= basis_weight_kg:
+        return None
+
+    need_kg = basis_weight_kg - target_weight_kg
+    need_pct = 100.0 * need_kg / basis_weight_kg
+    end_pct, used_dose = _trial_pct_for_dose(dose_mg)
+    endpoint_abs = abs(end_pct)
+
+    out: dict[str, Any] = {
+        "target_weight_kg": round(target_weight_kg, 1),
+        "need_loss_kg": round(need_kg, 1),
+        "need_pct": round(need_pct, 1),
+        "trial_endpoint_pct": endpoint_abs,
+        "used_dose_mg": used_dose,
+        "ratio_vs_trial": round(need_pct / endpoint_abs, 2) if endpoint_abs else None,
+    }
+
+    # 反解同一条曲线：shape(t) = need_pct / endpoint_pct
+    _norm = 1 - _math.exp(-SURMOUNT_TRIAL["weeks"] / _TRAJECTORY_TAU_WEEKS)
+    inner = (need_pct / endpoint_abs) * _norm if endpoint_abs else 2.0
+    if 0 < inner < 1:
+        weeks = -_TRAJECTORY_TAU_WEEKS * _math.log(1 - inner)
+        out["weeks_to_goal"] = round(weeks, 1)
+        out["reachable_within_trial"] = weeks <= SURMOUNT_TRIAL["weeks"]
+    else:
+        out["reachable_within_trial"] = False
+        out["note"] = (
+            f"目标需要减 {need_pct:.0f}% 体重，而 {SURMOUNT_TRIAL['name']} 在 "
+            f"{SURMOUNT_TRIAL['weeks']} 周的实测平均是 {endpoint_abs:.1f}%"
+            f"（{need_pct / endpoint_abs:.1f} 倍）。"
+            "这不是说做不到——试验里个体差异很大，也有人减得比平均多——"
+            "但单靠标准剂量的这一种药，平均结果达不到。值得和医生讨论阶段性目标。"
+        )
+    if current_weight_kg and current_weight_kg <= target_weight_kg * 1.02:
+        out["already_there"] = True
     return out

@@ -346,6 +346,8 @@ data class Bootstrap(
     val bmi: BmiInfo?,
     /** 营养达标（对照《中国居民膳食指南（2022）》）。 */
     val nutrition: Nutrition?,
+    /** 体重下降预测（SURMOUNT-1 实测终点 + 能量账）。 */
+    val weightForecast: WeightForecast?,
 ) {
     companion object {
         fun from(o: JSONObject): Bootstrap {
@@ -373,6 +375,7 @@ data class Bootstrap(
                 scheduleJson = o.optJSONArray("schedule")?.toString(),
                 bmi = BmiInfo.from(o.optJSONObject("bmi")),
                 nutrition = Nutrition.from(o.optJSONObject("nutrition")),
+                weightForecast = WeightForecast.from(o.optJSONObject("weight_forecast")),
             )
         }
     }
@@ -688,6 +691,116 @@ data class Nutrition(
                 },
                 gaps = gaps,
                 hasData = o.optBoolean("has_data", false),
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------- 体重预期
+/** 一个时间里程碑的预期体重。 */
+data class WeightMilestone(val weeks: Int, val pct: Double, val lossKg: Double, val weightKg: Double) {
+    companion object {
+        fun from(o: JSONObject) = WeightMilestone(
+            weeks = o.optInt("weeks"),
+            pct = o.optDouble("pct", 0.0),
+            lossKg = o.optDouble("loss_kg", 0.0),
+            weightKg = o.optDouble("weight_kg", 0.0),
+        )
+    }
+}
+
+/** 目标体重能不能到、要多久。 */
+data class GoalProjection(
+    val targetWeightKg: Double,
+    val needLossKg: Double,
+    val needPct: Double,
+    val trialEndpointPct: Double,
+    val usedDoseMg: Double,
+    val basisDoseMg: Double?,
+    val basisNote: String,
+    val ratioVsTrial: Double?,
+    val weeksToGoal: Double?,
+    val reachableWithinTrial: Boolean,
+    val note: String?,
+    val alreadyThere: Boolean,
+)
+
+/**
+ * 体重下降预测。
+ *
+ * 关键设计：**同时给试验预期和能量账两个数**。
+ * 试验预期（SURMOUNT-1 实测终点）回答"一般会瘦多少"；
+ * 能量账（7700 kcal/kg）回答"照现在的吃法账面上该瘦多少"。
+ * 两者不一致本身有信息量——差得越多，说明减重里药物作用的占比越大。
+ * 只报一个都会误导：只报能量账会低估，只报试验值会让人以为与吃多少无关。
+ */
+data class WeightForecast(
+    val weeks: Double,
+    val trialPct: Double,
+    val endpointPct: Double,
+    val endpointWeeks: Int,
+    val usedDoseMg: Double,
+    val isExtrapolatedCurve: Boolean,
+    val trialName: String,
+    val trialPopulation: String,
+    val trialCaveat: String,
+    val basisWeightKg: Double?,
+    val basisIsStartWeight: Boolean,
+    val expectedLossKg: Double?,
+    val expectedWeightKg: Double?,
+    val leanMassLossKg: Double?,
+    val fatMassLossKg: Double?,
+    val actualLossKg: Double?,
+    val milestones: List<WeightMilestone>,
+    val goal: GoalProjection?,
+) {
+    companion object {
+        fun from(o: JSONObject?): WeightForecast? {
+            if (o == null) return null
+            val t = o.optJSONObject("trial") ?: return null
+            val meta = o.optJSONObject("trial_meta")
+            val marks = mutableListOf<WeightMilestone>()
+            o.optJSONArray("milestones")?.let { arr ->
+                for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { marks.add(WeightMilestone.from(it)) }
+            }
+            fun num(obj: JSONObject?, key: String): Double? =
+                obj?.let { if (it.isNull(key)) null else it.optDouble(key).takeIf { v -> !v.isNaN() } }
+
+            val g = o.optJSONObject("goal")
+            return WeightForecast(
+                weeks = o.optDouble("weeks", 0.0),
+                trialPct = t.optDouble("pct", 0.0),
+                endpointPct = t.optDouble("endpoint_pct", 0.0),
+                endpointWeeks = t.optInt("endpoint_weeks", 72),
+                usedDoseMg = t.optDouble("used_dose_mg", 0.0),
+                isExtrapolatedCurve = t.optBoolean("is_extrapolated_curve", true),
+                trialName = meta?.optString("name").orEmpty().ifBlank { "SURMOUNT-1" },
+                trialPopulation = meta?.optString("population").orEmpty(),
+                trialCaveat = meta?.optString("caveat").orEmpty(),
+                basisWeightKg = num(o, "basis_weight_kg"),
+                basisIsStartWeight = o.optBoolean("basis_is_start_weight", false),
+                expectedLossKg = num(o, "expected_loss_kg"),
+                expectedWeightKg = num(o, "expected_weight_kg"),
+                leanMassLossKg = num(o, "lean_mass_loss_kg"),
+                fatMassLossKg = num(o, "fat_mass_loss_kg"),
+                actualLossKg = num(o, "actual_loss_kg"),
+                milestones = marks,
+                goal = g?.let {
+                    GoalProjection(
+                        targetWeightKg = it.optDouble("target_weight_kg", 0.0),
+                        needLossKg = it.optDouble("need_loss_kg", 0.0),
+                        needPct = it.optDouble("need_pct", 0.0),
+                        trialEndpointPct = it.optDouble("trial_endpoint_pct", 0.0),
+                        usedDoseMg = it.optDouble("used_dose_mg", 0.0),
+                        basisDoseMg = num(it, "basis_dose_mg"),
+                        basisNote = it.optString("basis_note"),
+                        ratioVsTrial = num(it, "ratio_vs_trial"),
+                        weeksToGoal = num(it, "weeks_to_goal"),
+                        reachableWithinTrial = it.optBoolean("reachable_within_trial", false),
+                        note = it.optString("note").takeIf { v -> v.isNotBlank() },
+                        alreadyThere = it.optBoolean("already_there", false),
+                    )
+                },
             )
         }
     }

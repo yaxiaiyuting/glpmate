@@ -81,6 +81,9 @@ fun TodayScreen(
         MealCard(data, onOpenFood)
         // 营养达标紧跟餐食卡：用户刚记完一餐，最想知道的就是"今天够了没有"
         NutritionCard(data.nutrition)
+        // 体重预期紧跟营养达标：一个说"吃够了没有"，一个说"照这样会瘦多少"，
+        // 两件事互为因果（蛋白质不够会掉肌肉，而掉肌肉会影响减重质量）
+        WeightForecastCard(data.weightForecast)
         WaterCard(data, busy, onAddWater)
         CompletedCard(data)
         HalfCards(data)

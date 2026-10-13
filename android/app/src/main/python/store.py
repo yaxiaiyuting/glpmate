@@ -451,6 +451,8 @@ class Store:
                     (targets["calories"] - totals["kcal"])
                     if targets.get("calories") and totals.get("kcal") else None
                 ),
+                target_weight_kg=profile.get("target_weight_kg"),
+                max_dose_mg=drug.get("max_dose_mg"),
             ),
             "today_stats": {
                 "calories": {"v": totals["kcal"], "t": targets["calories"]},

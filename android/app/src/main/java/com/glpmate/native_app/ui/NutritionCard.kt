@@ -113,12 +113,10 @@ fun NutritionCard(nutrition: Nutrition?, modifier: Modifier = Modifier) {
                         fontWeight = FontWeight.Medium,
                     )
                 }
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "≈ 每周 ${formatNum(d.weeklyKg, 2)} kg",
-                    color = GlpColors.Text2,
-                    fontSize = 11.5.sp,
-                )
+                // 这里**刻意不再显示"≈ 每周 X kg"**：那是纯能量账的推算
+                // （缺口 ÷ 7700），而下面的「体重预期」卡用的是 SURMOUNT-1 的实测终点。
+                // 两个数字会不一致，摆在一起只会让人不知道该信哪个——
+                // 减重的估算统一由「体重预期」卡负责，这里只说热量缺口本身。
             }
             Spacer(Modifier.height(4.dp))
             Text(d.note, color = GlpColors.Text3, fontSize = 10.5.sp, lineHeight = 15.sp)

@@ -978,15 +978,15 @@ private fun openImageStream(context: Context, uri: Uri): InputStream? {
     // 1) 正常路径：直接用拿到的 Uri
     try {
         resolver.openInputStream(uri)?.let { return it }
-        Log.w(TAG, "openInputStream 返回 null：${uri.scheme}://${uri.authority}")
+        Log.w(TAG, "openInputStream 返回 null（不是抛异常）：${uri.scheme}://${uri.authority}")
     } catch (e: SecurityException) {
-        Log.w(TAG, "直接读被拒（SecurityException）：${uri.scheme}://${uri.authority}")
+        Log.w(TAG, "直接读被拒 SecurityException：${uri.scheme}://${uri.authority} — ${e.message}")
     } catch (e: Exception) {
-        Log.w(TAG, "直接读失败（${e.javaClass.simpleName}）：${e.message}")
+        Log.w(TAG, "直接读失败 ${e.javaClass.name}：${e.message}", e)
     }
 
-    // 2) 兜底：从 Uri 末段取媒体 ID，换成 MediaStore 的标准 Uri
-    val mediaId = uri.lastPathSegment?.toLongOrNull()
+    // 2) 兜底：从 Uri 里解析出媒体 ID，换成 MediaStore 的标准 Uri 再试
+    val mediaId = mediaIdFrom(uri)
     if (mediaId != null) {
         for (base in listOf(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
@@ -999,11 +999,43 @@ private fun openImageStream(context: Context, uri: Uri): InputStream? {
                     return it
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "兜底失败（$base, id=$mediaId）：${e.javaClass.simpleName}")
+                Log.w(TAG, "兜底失败（$base, id=$mediaId）：${e.javaClass.simpleName}: ${e.message}")
             }
         }
     } else {
-        Log.w(TAG, "Uri 末段不是数字，无法按媒体 ID 兜底：${uri.lastPathSegment}")
+        Log.w(TAG, "从 Uri 解析不出媒体 ID，无法兜底：${uri}")
+    }
+    return null
+}
+
+/**
+ * 从各种相册 Uri 里解析出**媒体库的图片 ID**。
+ *
+ * ============ 这里踩过两个坑 ============
+ *
+ * ① **不能只看最后一段是不是纯数字。**
+ *    SAF 文档 Uri（OpenDocument 返回的）形如
+ *      content://com.android.providers.media.documents/document/image%3A2267
+ *    末段是 `image:2267`（%3A 是冒号转义），**不是** `2267`，
+ *    直接 toLongOrNull() 会返回 null，兜底整条失效。
+ *    这就是第一版"兜底写了却不生效"的原因。
+ *
+ * ② **ContentUris.parseId 只对 MediaStore 的 Uri 有效**，
+ *    对 SAF 文档 Uri 会抛异常，所以必须自己解析。
+ *
+ * 解析顺序：
+ *    - MediaStore 风格（末段是纯数字）→ 直接取
+ *    - SAF 文档风格（<type>:<数字>）→ 取冒号后的数字
+ *    - 两者都不匹配 → 返回 null，由调用方给中文原因
+ */
+private fun mediaIdFrom(uri: Uri): Long? {
+    val last = uri.lastPathSegment?.trim().orEmpty()
+    // MediaStore 风格：content://media/external/images/media/2267
+    last.toLongOrNull()?.let { return it }
+    // SAF 文档风格：image:2267 / video:123 / 2267
+    val digits = last.substringAfterLast(':').trim()
+    if (digits.isNotEmpty() && digits.all { it.isDigit() }) {
+        return digits.toLongOrNull()
     }
     return null
 }
@@ -1015,8 +1047,10 @@ private fun uriToJpeg(context: Context, uri: Uri): ByteArray {
         // 先按拿到的 Uri 试；失败再按媒体 ID 兜底（见 openImageStream 的说明）
         openImageStream(context, uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
             ?: throw IllegalStateException(
-                "系统没有授予这张图片的读取权限（${uri.scheme}://${uri.authority}）。" +
-                    "请换一张，或直接描述吃了什么交给教练。"
+                // 不要说成"没有权限"——权限可能是给了的，真实原因需要看日志。
+                // 原来的措辞把排查方向带偏过一次（用户确实给了权限却被告知没给）。
+                "这张图片读不出来（来源 ${uri.authority}）。" +
+                    "换一张试试，或直接描述吃了什么交给教练估算。"
             )
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
             throw IllegalStateException("这张图片没法解码（可能是不支持的格式），请换一张或改用文字描述交给教练。")

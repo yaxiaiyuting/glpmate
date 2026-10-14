@@ -61,6 +61,7 @@ glpmate/          Python 后端（核心仅标准库；Pillow 为可选，见下
   server.py       HTTP 服务与 API
   coach.py        可选的 AI 教练
   hitrack.py      华为运动健康 HiTrack 轨迹解析
+dist/             预编译的安装包（可直接下载安装，见下）
 static/           Web 前端（原生 JS，无框架无构建步骤）
 tests/            后端测试
 android/          原生 Android 客户端（Kotlin + Compose，内嵌 CPython）
@@ -96,6 +97,18 @@ python3 run.py --db /path/to/my.db        # 指定数据库
 python3 run.py --port 9000                # 换端口
 python3 run.py --import-hitrack <目录>    # 导入华为运动健康轨迹
 ```
+
+## 直接安装（不想自己构建）
+
+`dist/glpmate-1.0.0-native.apk` 是**已经构建好、签好名**的安装包（21 MB，arm64-v8a），
+传到手机点击安装即可。细节见 [`dist/README.md`](dist/README.md)。
+
+**签名是固定的**：用仓库里的 `glpmate-release.jks`（密码公开）。这是刻意的——
+安卓更新应用要求签名一致，如果每台机器各自签名，用户装更新会被系统拒绝，
+只能卸载重装，**而卸载会清空全部记录**。密钥和密码一起公开，
+任何人在任何机器上重新构建都能得到可签名覆盖安装的包。
+
+**首次打开请允许通知权限**：用药提醒依赖它，拒绝的话提醒会被系统静默丢弃。
 
 ## 构建 Android 客户端
 

@@ -55,17 +55,46 @@
 
 以上许可证均与 GPL-3.0 兼容。
 
-## 四、设计与思路上的影响
+## 四、图标与吉祥物：Tux
+
+应用图标与吉祥物使用 **Tux**（企鹅），由 **[Larry Ewing](https://en.wikipedia.org/wiki/Tux_(mascot))** 于 1996 年用 GIMP 创作，是 Linux 内核的品牌角色。
+
+### 授权原文与我们的履行
+
+Larry Ewing 的原始声明是：
+
+> Permission to use and/or modify this image is granted provided you acknowledge me
+> lewing@isc.tamu.edu and The GIMP if someone asks.
+
+**这不是一个标准开源许可证**（不是 CC、不是 MIT、也不是 GPL），而是一段自定义的许可声明。它的条件是"**被问起时致谢**"，而不是要求随附许可证文本。我们据此履行：
+
+- 本文件即为致谢，随仓库与发布物一同分发。
+- 使用了 [Wikimedia Commons 上的原始素材](https://commons.wikimedia.org/wiki/File:Tux.svg)（`Tux.svg`），**没有改动图形本身**——只做了等比缩放。
+  （原文写的是 "use and/or modify"，但保留原图更省事，也避免产生衍生作品带来的额外说明义务。）
+- 图标背景层由本项目添加（浅色渐变）。Tux 本体未被重绘、改色或变形。
+
+### 需要知道的两件事
+
+1. **Tux 是 Linux 的象征。** 把它用在一个健康管理应用上，可能让部分用户以为这是 Linux 工具。选择它是刻意的（见下），但这是个真实的取舍。
+2. **Tux 是 Linux 内核的"品牌角色"（brand character），不是官方 logo。** Tux 当年并没有赢得那三场 Linux logo 竞赛，因此 Linux 官方对它的定位是品牌角色。这反而使它的使用限制比正式商标宽松。
+
+### 为什么选 Tux
+
+Linus Torvalds 当年选企鹅的理由，和这个应用的场景意外地契合——他想要一个"**刚吃饱、心满意足地坐着**的胖企鹅"（原文见 Wikipedia 条目：*a slightly fat penguin sitting down after having eaten a great meal*）。
+
+对一个 GLP-1 用药者的记录应用来说，这个意象本身就是个温和的提醒；而且 Tux 是自由软件社区最被认得的形象之一，与本项目的 GPL-3.0 定位一致。
+
+## 五、设计与思路上的影响
 
 - **Arris**（一个开源的音乐播放器 Android 项目）—— 本项目在**架构取向上**参考了它：原生 Kotlin + Compose 做界面、后端作为**独立进程/服务**通过 HTTP 通信，而不是把逻辑塞进 WebView。本项目**没有复制它的任何代码**，两者业务领域也完全不同。它是一个 GPL-3.0 兼容的开源项目。
 
-## 五、需要明确排除的
+## 六、需要明确排除的
 
 以下**没有**在本项目中使用，列出来是为了避免误解：
 
 - **GLPMate 原版 App 的代码或资源** —— 本项目是独立实现的，没有反编译、提取或复用其任何代码或资产。其中的药代算法是**根据公开说明书参数从零推导**的（一室模型 + 一阶吸收的 Bateman 方程），并非复制原版的实现。
 - **任何逆向工程、注入或解密手段** —— 本项目不 hook、不注入、不绕过任何 App 的保护机制。
 
-## 六、如果你发现了遗漏
+## 七、如果你发现了遗漏
 
 如果这里漏掉了应当致谢的来源，请开 issue 指出——**这是本项目认真对待的事**。药代参数若与说明书不符，属于 bug，请一并附上出处。

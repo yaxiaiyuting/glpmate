@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  自适应图标（Android 8.0+）。
+
+  前景 Tux 只占 108dp 画布的 58dp 高——这是刻意的：
+  系统会把图标裁成圆形/圆角方形等形状，只保证中间约 66dp 可见。
+  按 64dp 试过，圆形遮罩下 Tux 的头和脚几乎贴边（视觉上太挤），所以收到 58dp。
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>

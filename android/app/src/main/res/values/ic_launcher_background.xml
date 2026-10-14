@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  自适应图标的背景层颜色。
+
+  为什么用浅色而不是应用的深色主题（#0B0F12）：
+  Tux 的身体是黑色的，深色背景上轮廓和背景糊在一起（试过，只剩白肚子和嘴看得见）。
+  启动器图标的可辨识度优先于与界面主题一致。
+-->
+<resources>
+    <color name="ic_launcher_background">#E9F1F7</color>
+</resources>

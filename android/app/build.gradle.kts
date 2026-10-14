@@ -9,6 +9,26 @@ android {
     namespace = "com.glpmate.native_app"
     compileSdk = 36
 
+    // 项目专用签名密钥（刻意连同密码一起提交到仓库）。
+    //
+    // 为什么不用 debug 签名：`signingConfigs.getByName("debug")` 用的是 Gradle 在
+    // **当前机器**自动生成的 ~/.android/debug.keystore。换一台机器构建 → 签名不同 →
+    // 用户安装更新时被系统拒绝（INSTALL_FAILED_UPDATE_INCOMPATIBLE），
+    // 只能卸载重装（会丢数据）。开源项目里这是很常见的坑。
+    //
+    // 这个密钥**不是机密**：它只用于给这个开源应用签名，任何人都能下载仓库
+    // 用同一把钥匙构建出可覆盖安装的包。密码公开是刻意的——
+    // 不公开的话别人重新构建就会签名不一致，反而制造问题。
+    // 如果要上应用商店，请换一把只自己掌握的密钥并从这里移除。
+    signingConfigs {
+        create("glpmateRelease") {
+            storeFile = file("../glpmate-release.jks")
+            storePassword = "glpmate-release"
+            keyAlias = "glpmate"
+            keyPassword = "glpmate-release"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.glpmate.nativeapp"
         minSdk = 26
@@ -44,8 +64,18 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            // 开混淆 + 资源压缩：debug 版 37MB 里绝大部分是没被裁掉的
+            // Compose/Kotlin 代码（classes7.dex 单独就有 10.8MB）。
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            // 正式包**不带** skipNotifPrompt：必须请求通知权限，
+            // 否则提醒会被系统静默丢弃（见 defaultConfig 的说明）。
+            manifestPlaceholders["skipNotificationPrompt"] = "false"
+            signingConfig = signingConfigs.getByName("glpmateRelease")
         }
     }
 }

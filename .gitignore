@@ -21,10 +21,15 @@ venv/
 .gradle/
 build/
 local.properties
+# APK 与签名密钥是**要发布**的，所以从上面的通配排除里放行。
+# 用 ! 例外而不是删掉 *.apk：这样本地随手构建的包仍然不会误入库，
+# 只有明确放进 dist/ 的那一个会被跟踪。
 *.apk
 *.aab
 *.keystore
 *.jks
+!dist/*.apk
+!glpmate-release.jks
 captures/
 
 # IDE / 系统

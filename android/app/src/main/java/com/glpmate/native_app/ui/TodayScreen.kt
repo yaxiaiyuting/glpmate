@@ -79,6 +79,14 @@ fun TodayScreen(
         SectionHead("今日你的记录")
         FeelingCard(data)
         MealCard(data, onOpenFood)
+        // 三餐三栏：紧接餐食卡，回答"早/午/晚分别吃了什么、多少热量"
+        MealSlotsCard(
+            slots = data.mealsBySlot,
+            totalKcal = data.stats.calories.v,
+            totalProtein = data.stats.protein.v,
+            kcalTarget = data.stats.calories.t,
+            proteinTarget = data.stats.protein.t,
+        )
         // 营养达标紧跟餐食卡：用户刚记完一餐，最想知道的就是"今天够了没有"
         NutritionCard(data.nutrition)
         // 体重预期紧跟营养达标：一个说"吃够了没有"，一个说"照这样会瘦多少"，

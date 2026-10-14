@@ -364,6 +364,54 @@ class Store:
         return self.records(types=["dose"], order="asc", limit=5000)
 
     # ---------------------------------------------------------------- 汇总
+    # 餐次顺序固定：早 → 午 → 晚 → 加餐。顺序不能靠数据库返回顺序，
+    # 否则界面上三栏会随机排列。
+    SLOT_ORDER = ("breakfast", "lunch", "dinner", "snack")
+    SLOT_CN = {"breakfast": "早餐", "lunch": "午餐", "dinner": "晚餐", "snack": "加餐"}
+
+    def _meals_by_slot(self, today_recs, targets) -> list[dict[str, Any]]:
+        """今日三餐 + 加餐的明细与小计，按固定顺序返回。
+
+        每栏都给出 kcal / 蛋白 的小计与目标占比，以及"这一栏记了没有"——
+        界面靠它决定显示"还没记录"还是数字。
+        """
+        buckets: dict[str, list[Any]] = {k: [] for k in self.SLOT_ORDER}
+        for r in today_recs:
+            if r.type != "food":
+                continue
+            slot = str(r.meta.get("slot") or "snack")
+            if slot not in buckets:
+                slot = "snack"
+            buckets[slot].append(r)
+        kcal_target = float(targets.get("calories") or 0.0)
+        prot_target = float(targets.get("protein_g") or 0.0)
+        out: list[dict[str, Any]] = []
+        for slot in self.SLOT_ORDER:
+            items = buckets[slot]
+            kcal = sum(r.meta_num("kcal") for r in items)
+            prot = sum(r.meta_num("protein_g") for r in items)
+            out.append({
+                "slot": slot,
+                "label": self.SLOT_CN[slot],
+                "count": len(items),
+                "kcal": round(kcal, 0),
+                "protein_g": round(prot, 1),
+                # 目标占比：这一餐的参考份额用"三餐各 1/3、加餐不算"这种简单口径
+                # 只会误导，所以这里给的是"占全天目标的比例"，让用户自己看总量。
+                "kcal_pct": round(100.0 * kcal / kcal_target, 1) if kcal_target else None,
+                "protein_pct": round(100.0 * prot / prot_target, 1) if prot_target else None,
+                "items": [
+                    {
+                        "time": r.at.strftime("%H:%M"),
+                        "desc": str(r.meta.get("desc") or "").strip(),
+                        "kcal": round(r.meta_num("kcal"), 0),
+                        "protein_g": round(r.meta_num("protein_g"), 1),
+                    }
+                    for r in items
+                ],
+            })
+        return out
+
     def bootstrap(self, today: Optional[date] = None) -> dict[str, Any]:
         today = today or date.today()
         profile = self.profile()
@@ -454,6 +502,9 @@ class Store:
                 target_weight_kg=profile.get("target_weight_kg"),
                 max_dose_mg=drug.get("max_dose_mg"),
             ),
+            # 按餐次分组的今日餐食：首页和饮食页都要"早/午/晚分别吃了什么、多少热量"。
+            # 放在后端算而不是各端自己分：口径只有一处，三个前端不会算出不同的数。
+            "meals_by_slot": self._meals_by_slot(today_recs, targets),
             "today_stats": {
                 "calories": {"v": totals["kcal"], "t": targets["calories"]},
                 "protein": {"v": totals["protein_g"], "t": targets["protein_g"]},

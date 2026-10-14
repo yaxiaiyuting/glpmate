@@ -348,6 +348,8 @@ data class Bootstrap(
     val nutrition: Nutrition?,
     /** 体重下降预测（SURMOUNT-1 实测终点 + 能量账）。 */
     val weightForecast: WeightForecast?,
+    /** 今日按餐次分组的明细（早→午→晚→加餐）。 */
+    val mealsBySlot: List<MealSlot>,
 ) {
     companion object {
         fun from(o: JSONObject): Bootstrap {
@@ -376,6 +378,13 @@ data class Bootstrap(
                 bmi = BmiInfo.from(o.optJSONObject("bmi")),
                 nutrition = Nutrition.from(o.optJSONObject("nutrition")),
                 weightForecast = WeightForecast.from(o.optJSONObject("weight_forecast")),
+                mealsBySlot = buildList {
+                    o.optJSONArray("meals_by_slot")?.let { arr ->
+                        for (i in 0 until arr.length()) {
+                            arr.optJSONObject(i)?.let { add(MealSlot.from(it)) }
+                        }
+                    }
+                },
             )
         }
     }
@@ -801,6 +810,57 @@ data class WeightForecast(
                         alreadyThere = it.optBoolean("already_there", false),
                     )
                 },
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------- 分餐次
+/** 某一餐里的一条记录。 */
+data class MealItem(val time: String, val desc: String, val kcal: Double, val proteinG: Double) {
+    companion object {
+        fun from(o: JSONObject) = MealItem(
+            time = o.optString("time"),
+            desc = o.optString("desc"),
+            kcal = o.optDouble("kcal", 0.0),
+            proteinG = o.optDouble("protein_g", 0.0),
+        )
+    }
+}
+
+/**
+ * 一个餐次的汇总（早/午/晚/加餐）。
+ *
+ * 后端按固定顺序返回（早→午→晚→加餐），界面直接照着渲染即可——
+ * 顺序不在客户端拼，否则三个前端可能排出不同的顺序。
+ */
+data class MealSlot(
+    val slot: String,
+    val label: String,
+    val count: Int,
+    val kcal: Double,
+    val proteinG: Double,
+    val kcalPct: Double?,
+    val proteinPct: Double?,
+    val items: List<MealItem>,
+) {
+    val isEmpty: Boolean get() = count == 0
+
+    companion object {
+        fun from(o: JSONObject): MealSlot {
+            val items = mutableListOf<MealItem>()
+            o.optJSONArray("items")?.let { arr ->
+                for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { items.add(MealItem.from(it)) }
+            }
+            return MealSlot(
+                slot = o.optString("slot"),
+                label = o.optString("label"),
+                count = o.optInt("count", 0),
+                kcal = o.optDouble("kcal", 0.0),
+                proteinG = o.optDouble("protein_g", 0.0),
+                kcalPct = if (o.isNull("kcal_pct")) null else o.optDouble("kcal_pct"),
+                proteinPct = if (o.isNull("protein_pct")) null else o.optDouble("protein_pct"),
+                items = items,
             )
         }
     }

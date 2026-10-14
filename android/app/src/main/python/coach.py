@@ -338,8 +338,43 @@ def context_text(ctx: dict[str, Any]) -> str:
         f"饮水 {t.get('water_ml') / 1000:g} 升"
     )
     lines.append("")
-    lines.append("逐日记录（新 → 旧）：")
+    # ============ 今天单独置顶 ============
+    # 为什么：原来只有一段"逐日记录（新→旧）"，今天夹在 14 天里。
+    # 后果有两个：模型容易把昨天的餐食当成今天的；也看不出"这一餐是不是已经记过"。
+    # 现在把今天拎出来、明确标注"已经记录（不要重复记）"，并给出分餐次的小计。
+    today_key = ctx["today"]
+    today_bucket = (ctx.get("days") or {}).get(today_key)
+    lines.append(f"今天已经记录的餐食（{today_key}，**这些都已经入库，不要再记一遍**）：")
+    if today_bucket and today_bucket.get("meals"):
+        slot_cn = {"breakfast": "早餐", "lunch": "午餐", "dinner": "晚餐", "snack": "加餐"}
+        for m in today_bucket["meals"]:
+            name = slot_cn.get(str(m.get("slot")), str(m.get("slot") or "餐食"))
+            lines.append(
+                f"  · {name}({m['time']}) {m['desc']} — {m['kcal']:.0f} kcal / 蛋白 {m['protein_g']:.0f} g"
+            )
+        tk = sum(m["kcal"] for m in today_bucket["meals"])
+        tp = sum(m["protein_g"] for m in today_bucket["meals"])
+        lines.append(f"  今天餐食合计：{tk:.0f} kcal / 蛋白 {tp:.0f} g（已记录 {len(today_bucket['meals'])} 餐）")
+        lines.append(f"  蛋白目标 {t.get('protein_g'):g} g，还差 {max(0, t.get('protein_g', 0) - tp):.0f} g")
+    else:
+        lines.append("  （今天还没有记录任何餐食）")
+    if today_bucket:
+        if today_bucket.get("water_ml"):
+            lines.append(f"  今天饮水：{today_bucket['water_ml'] / 1000:.1f} 升")
+        if today_bucket.get("training_min"):
+            lines.append(f"  今天训练：{today_bucket['training_min']:.0f} 分钟")
+        if today_bucket.get("doses"):
+            lines.append("  今天注射：" + "、".join(
+                f"{d['time']} {d['mg']:g}mg" + ("（跳过）" if d.get("skipped") else "")
+                for d in today_bucket["doses"]))
+        for s_ in today_bucket.get("side_effects", []):
+            lines.append(f"  今天不适：{s_['label']} {s_['severity']}/10")
+
+    lines.append("")
+    lines.append("往期记录（新 → 旧，仅供趋势参考，**不是今天的内容**）：")
     for day in sorted(ctx["days"], reverse=True):
+        if day == today_key:
+            continue
         b = ctx["days"][day]
         parts = []
         if b["doses"]:
@@ -387,6 +422,20 @@ SYSTEM_PROMPT = """你是 GLP Mate Lite 里内置的记录助手，用户正在�
 ```
 
 卡片块的规则：type 只能是 meal_confirm / record_confirm；payload.records 里每条都必须有 type、at、meta；不要在卡片块外面重复 JSON；不需要写记录时就不要输出卡片块。
+
+============ 生成卡片前必须先核对：这条已经记过了吗 ============
+上面「今天已经记录的餐食」列出的每一条，都**已经入库了**。规则：
+
+1. **绝不重复记录已经存在的餐食。** 如果用户在「今天已经记录的餐食」里
+   已经有早餐，就不要因为他说了午饭而"顺便"再把早餐记一次。
+2. **只记录用户本轮新提到的内容。** 用户说「午饭吃了鱼肉」，就只生成午饭；
+   早餐是他之前说过的，不是这一轮的新信息。
+3. **提到了已有记录时，不要生成卡片**，只用一句话确认它已经在了，
+   例如「早餐的燕麦牛奶已经记过了（305 kcal / 蛋白 13 g）」。
+4. **如果本轮描述的那一餐已经存在**（比如早餐已记、他又补充「早餐还喝了一杯豆浆」），
+   只生成**补充的那部分**，不要重发整餐。
+5. 不确定是否已记过时，倾向于**不生成卡片**并反问一句，而不是多记一条——
+   多记一条会污染当天的热量和蛋白统计，用户很难发现。
 
 下面是用户的真实数据，回答时以它为准：
 
@@ -444,7 +493,16 @@ class Coach:
         ctx = build_context(self.store, today)
         system = SYSTEM_PROMPT.replace("{context}", context_text(ctx))
         messages: list[dict[str, Any]] = [{"role": "system", "content": system}]
-        for msg in self.store.messages(limit=history_limit):
+        # 对话历史**只取今天的**。
+        #
+        # 为什么：逐日记录已经在 system 里给了（带日期、带当天合计），
+        # 如果历史再跨天，同一餐会在模型眼里出现两遍——一次在数据里、
+        # 一次在昨天的对话里。后果是用户中午说"午饭吃了鱼肉"时，模型
+        # 把历史里早上的早餐当成新信息**又记一遍**（真机上出现过）。
+        #
+        # 而且历史里不带日期，模型分不清"刚才说的"和"昨天说的"。
+        # 跨天的趋势问题由逐日记录回答，不需要靠对话历史。
+        for msg in self.store.messages(limit=history_limit, since=today):
             if msg["role"] in ("user", "assistant") and msg["text"]:
                 messages.append({"role": msg["role"], "content": msg["text"]})
         messages.append({"role": "user", "content": text})

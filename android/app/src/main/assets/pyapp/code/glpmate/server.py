@@ -468,6 +468,61 @@ class App:
         return 200, {"ok": True}
 
     # ------------------------------------------------------------ 教练
+    @route("POST", "/api/records/dedupe")
+    def records_dedupe(self, req: Request) -> tuple[int, Any]:
+        """清理重复记录（同类型+同分钟+同餐次+同描述），保留最早一条。
+
+        真机上出现过同一餐被记 4 次（同一餐生成了多张卡片、各自确认）。
+        这个接口用于清理已经产生的脏数据；新数据由 add_record(skip_if_exists=True) 挡住。
+        """
+        body = req.json() if req.body else {}
+        return 200, self.store.dedupe_records(dry_run=bool(body.get("dry_run")))
+
+    @route("POST", "/api/coach/cards/prune")
+    def cards_prune(self, req: Request) -> tuple[int, Any]:
+        """清理两类无用的待确认卡片。
+
+        ① **空卡片**：拍照识别失败时后端也会建卡（既定行为），那种卡片
+           desc 是占位文字「一餐」、热量为 0。确认它等于记一条空餐食。
+           真机上留下了 4 张这样的卡片，混在聊天里很干扰。
+        ② **已被记录覆盖的卡片**：同一餐已经落库了，但对应的卡片还是 pending。
+           留着它用户点一下就又记一遍——这正是重复记录的入口
+           （真机上同一张早餐卡片被确认了 4 次）。
+        """
+        pruned: list[dict[str, str]] = []
+        for card in self.store.pending_cards(limit=200):
+            if card.get("kind") != "meal_confirm":
+                continue
+            recs = (card.get("payload") or {}).get("records") or []
+            if not recs:
+                continue
+            # ① 空卡片：全部记录都是 0 热量且描述是占位词
+            useless = all(
+                float((r.get("meta") or {}).get("kcal") or 0) <= 0
+                and str((r.get("meta") or {}).get("desc") or "").strip() in ("", "一餐")
+                for r in recs
+            )
+            reason = "空卡片" if useless else ""
+            # ② 已被记录覆盖
+            #
+            # 必须走 find_similar_record（带描述相似度），不能用 existing_identities()
+            # 的精确 key 集合——真机上卡片写「120ml牛奶」、记录是「120ml全脂牛奶」，
+            # 精确比较永远不命中，那张卡片就一直挂在那里等着被误确认。
+            if not useless:
+                covered = all(
+                    self.store.find_similar_record(
+                        str(r.get("type") or ""), str(r.get("at") or ""), r.get("meta") or {},
+                    ) is not None
+                    for r in recs
+                )
+                if covered:
+                    reason = "已被记录覆盖"
+            if reason:
+                self.store.confirm_card(card["id"], "discard")
+                pruned.append({"id": card["id"], "reason": reason})
+        return 200, {"pruned": len(pruned), "items": pruned,
+                     "ids": [p["id"] for p in pruned]}
+
     @route("GET", "/api/coach/messages")
     def coach_messages(self, req: Request) -> tuple[int, Any]:
         limit = req.q_int("limit", 200)

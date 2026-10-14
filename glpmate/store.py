@@ -7,9 +7,11 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import threading
 import time
+import uuid
 from datetime import date, datetime, timedelta, time as dtime
 from pathlib import Path
 from typing import Any, Iterable, Optional, Sequence
@@ -290,8 +292,24 @@ class Store:
         }
 
     # ---------------------------------------------------------------- 记录
-    def add_record(self, payload: dict[str, Any], source: str = "manual") -> Record:
+    def add_record(self, payload: dict[str, Any], source: str = "manual", *,
+                   skip_if_exists: bool = False) -> Record:
+        """新增一条记录。
+
+        `skip_if_exists=True` 时，如果同一类型+同一分钟+同一餐次+同一描述
+        的记录已存在，直接返回它而不插新行。
+
+        用途：教练确认卡片的路径。同一餐被生成多张卡片、各自确认时，
+        第二次及以后会命中这里——真机上出现过同一餐被记 4 次
+        （早餐 14:11 那条有 4 条完全相同的记录）。
+        `confirm_card` 只防得住"同一张卡片确认两次"，防不住"同一餐多张卡片"，
+        这一层是最后一道防线。
+        """
         norm = normalize_payload(payload)
+        if skip_if_exists:
+            same = self.find_similar_record(norm["type"], fmt_dt(norm["at"]), norm["meta"])
+            if same is not None:
+                return same
         now = fmt_dt(datetime.now())
         cur = self.db.execute(
             "INSERT INTO records(type, at, day, value, unit, meta, source, created) "
@@ -411,6 +429,145 @@ class Store:
                 ],
             })
         return out
+
+    # ---------------------------------------------------------------- 重复记录
+    @staticmethod
+    def _record_identity(rec_type: str, at: str, meta_or_value: Any) -> tuple:
+        """一条记录的"身份"：同类型 + 同一时刻 + 同一餐次 + 同一描述。
+
+        刻意**不包含热量/蛋白这些估算值**：模型两次估算同一条餐食可能给出
+        略微不同的数字，但它是同一餐。用数值做身份会导致"因为估算差 1 kcal
+        所以判成两条"，那正是重复记录的来源之一。
+        """
+        m = meta_or_value if isinstance(meta_or_value, dict) else {}
+        return (
+            str(rec_type or ""),
+            str(at or "")[:16],                        # 精确到分钟
+            str(m.get("slot") or ""),
+            Store._desc_key(m.get("desc")),
+        )
+
+    @staticmethod
+    def _desc_key(desc: Any) -> str:
+        """描述的比较键：剔掉数字、单位、标点和空白，只留中文，并排序。
+
+        **为什么不能直接比字符串。** 真机上同一份早餐，卡片写的是
+        「20g燕麦+2个水煮蛋+120ml牛奶」，落库后是「20g燕麦+2个水煮蛋+120ml全脂牛奶」——
+        差一个「全脂」，字符串比较就判成两道不同的餐，去重全部失效
+        （那张卡片因此一直挂在待确认列表里，用户点一下就会再记一条）。
+
+        剔掉数字和单位是刻意的：份量估算本来就会浮动（「约80g」vs「80g」），
+        而**是不是同一餐取决于吃了什么，不取决于记了几克**。
+
+        排序是为了让「鸡蛋+牛奶」和「牛奶+鸡蛋」视为同一餐——
+        模型复述时顺序不固定。
+        """
+        text = str(desc or "")
+        # 先把「数字 + 单位」整段去掉（120ml / 20g / 3个 / 约80克）
+        text = re.sub(
+            r"[0-9０-９.]+\s*(kg|KG|g|G|ml|ML|mL|L|l|克|千克|毫升|升|两|片|个|只|碗|杯|勺|张|份|根|条|颗)?",
+            "", text,
+        )
+        # 再去掉孤立的中文量词和标点
+        text = re.sub(r"[克升两片个只碗杯勺张份根条约]", "", text)
+        cleaned = re.sub(r"[^\u4e00-\u9fff]", "", text)
+        return "".join(sorted(cleaned))[:80]
+
+    @staticmethod
+    def _desc_similar(a: Any, b: Any) -> float:
+        """两条描述的相似度（0-1），用字符集合的 Jaccard 系数。
+
+        为什么需要它：**同一个人描述同一餐，措辞会有小差异**
+        （「120ml牛奶」vs「120ml全脂牛奶」）。要求完全相等会让去重在实际使用中失效，
+        但放得太松又会把「鸡胸肉+葡萄」和「鸡胸肉+米饭」误判成同一餐。
+
+        用字符集合而不是编辑距离：中文食物名是词组，
+        加一个形容词（「全脂」「煎」）只占少数几个字，Jaccard 对这类插入不敏感。
+        """
+        sa, sb = set(str(a or "")), set(str(b or ""))
+        if not sa or not sb:
+            return 0.0
+        return len(sa & sb) / len(sa | sb)
+
+    # 判定"同一餐"的描述相似度阈值。
+    #
+    # 标定依据（用真机上的真实描述跑出来的）：
+    #   同一餐、措辞有小差异（牛奶 / 全脂牛奶）  → 0.778
+    #   不同餐、只差主食（鸡胸肉+葡萄 / 鸡胸肉+米饭）→ 0.429
+    # 0.7 落在这两者之间，两边都有余量。
+    DESC_SIMILARITY_THRESHOLD = 0.7
+
+    def find_similar_record(self, rec_type: str, at: str, meta: dict[str, Any]) -> Optional[Record]:
+        """找出"同一餐"的已有记录：类型相同、同一分钟、同一餐次、且描述相似。
+
+        描述用相似度而不是相等——同一个人描述同一餐会有小差异
+        （「120ml牛奶」vs「120ml全脂牛奶」），要求完全相等会让去重失效。
+        """
+        at_min = str(at or "")[:16]
+        slot = str((meta or {}).get("slot") or "")
+        key = self._desc_key((meta or {}).get("desc"))
+        try:
+            day = parse_dt(at).date()
+        except Exception:
+            return None
+        for r in self.records(day, day, limit=2000):
+            if r.type != rec_type:
+                continue
+            if fmt_dt(r.at)[:16] != at_min:
+                continue
+            if str(r.meta.get("slot") or "") != slot:
+                continue
+            if self._desc_similar(key, self._desc_key(r.meta.get("desc"))) >= self.DESC_SIMILARITY_THRESHOLD:
+                return r
+        return None
+
+    def existing_identities(self, day: Optional[date] = None) -> set[tuple]:
+        """某天（默认今天）已存在记录的身份集合，供去重判断。"""
+        day = day or date.today()
+        return {
+            self._record_identity(r.type, fmt_dt(r.at), r.meta)
+            for r in self.records(day, day, limit=2000)
+        }
+
+    def dedupe_records(self, dry_run: bool = False) -> dict[str, Any]:
+        """清理已经存在的重复记录（同类型+同分钟+同餐次+同描述），保留最早一条。
+
+        返回被删掉的条数与明细，界面/脚本可以据此告诉用户"清掉了 N 条重复"。
+        只删**完全同身份**的记录；同一餐不同时间的记录不动。
+        """
+        recs = self.records(limit=5000, order="asc")
+        kept: list[Record] = []
+        dupes: list[Record] = []
+        for r in recs:
+            at_min = fmt_dt(r.at)[:16]
+            slot = str(r.meta.get("slot") or "")
+            key = self._desc_key(r.meta.get("desc"))
+            hit = None
+            for prev in kept:
+                if prev.type != r.type or fmt_dt(prev.at)[:16] != at_min:
+                    continue
+                if str(prev.meta.get("slot") or "") != slot:
+                    continue
+                if self._desc_similar(key, self._desc_key(prev.meta.get("desc"))) >= self.DESC_SIMILARITY_THRESHOLD:
+                    hit = prev
+                    break
+            if hit is not None:
+                dupes.append(r)
+            else:
+                kept.append(r)
+        seen = {i: r for i, r in enumerate(kept)}
+        if not dry_run:
+            for r in dupes:
+                self.delete_record(r.id)
+        return {
+            "removed": len(dupes),
+            "kept": len(seen),
+            "items": [
+                {"id": r.id, "type": r.type, "at": fmt_dt(r.at),
+                 "desc": str(r.meta.get("desc") or "")}
+                for r in dupes
+            ],
+        }
 
     def bootstrap(self, today: Optional[date] = None) -> dict[str, Any]:
         today = today or date.today()
@@ -794,8 +951,30 @@ class Store:
         return cur.rowcount
 
     # ---------------------------------------------------------------- 待确认卡片
+    def pending_cards(self, limit: int = 200) -> list[dict[str, Any]]:
+        """列出仍待确认的卡片（供清理与界面用）。"""
+        rows = self.db.query(
+            "SELECT * FROM pending_cards WHERE status = 'pending' ORDER BY id DESC LIMIT ?",
+            (limit,),
+        )
+        return [
+            {"id": r["id"], "kind": r["kind"], "status": r["status"],
+             "payload": json.loads(r["payload"] or "{}"), "created": r["created"]}
+            for r in rows
+        ]
+
     def create_card(self, kind: str, payload: dict[str, Any]) -> dict[str, Any]:
-        cid = f"card_{int(time.time() * 1000)}_{len(payload)}"
+        """建一张待确认卡片。
+
+        ID 用 uuid4，**不要用时间戳拼长度**。
+        原来的写法是 `card_{毫秒时间戳}_{payload长度}`，两个字段都可能撞车：
+          - 同一毫秒内建两张（用户连点两下就会）→ 时间戳相同
+          - payload 的 key 数量相同 → 长度相同
+        真机上直接抛过 `UNIQUE constraint failed: pending_cards.id`。
+        撞车本身还会掩盖问题：旧记录原地不动，用户以为"确认了但没反应"，
+        于是再点一次——**这正是同一餐被记多遍的推手之一**。
+        """
+        cid = f"card_{uuid.uuid4().hex[:16]}"
         self.db.execute(
             "INSERT INTO pending_cards(id, kind, payload, status, created) VALUES(?,?,?,?,?)",
             (cid, kind, json.dumps(payload, ensure_ascii=False), "pending", fmt_dt(datetime.now())),
@@ -820,7 +999,9 @@ class Store:
             payload = card["payload"]
             recs = payload.get("records") or ([payload["record"]] if payload.get("record") else [])
             for rec in recs:
-                created = self.add_record(rec, source="coach")
+                # skip_if_exists：同一餐被生成多张卡片、各自确认时，
+                # 第二次及以后直接返回已有记录，不再插一条（真机出现过记 4 次）。
+                created = self.add_record(rec, source="coach", skip_if_exists=True)
                 if created.id:
                     record_ids.append(created.id)
         self.db.execute("UPDATE pending_cards SET status = ?, record_id = ? WHERE id = ?",
